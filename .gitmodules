@@ -1,4 +1,4 @@
 [submodule "argilla"]
 	path = argilla
 	url = https://github.com/JonnyTran/extralit
-	branch = releases/v1.21.0b
+	branch = releases/v1.26.1
