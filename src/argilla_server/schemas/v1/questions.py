@@ -44,7 +44,7 @@ VALUE_TEXT_OPTION_TEXT_MAX_LENGTH = 500
 VALUE_TEXT_OPTION_DESCRIPTION_MIN_LENGTH = 1
 VALUE_TEXT_OPTION_DESCRIPTION_MAX_LENGTH = 1000
 
-LABEL_SELECTION_OPTIONS_MIN_ITEMS = 2
+LABEL_SELECTION_OPTIONS_MIN_ITEMS = 0
 LABEL_SELECTION_OPTIONS_MAX_ITEMS = 250
 LABEL_SELECTION_MIN_VISIBLE_OPTIONS = 3
 
@@ -52,9 +52,9 @@ RANKING_OPTIONS_MIN_ITEMS = 2
 RANKING_OPTIONS_MAX_ITEMS = 50
 
 RATING_OPTIONS_MIN_ITEMS = 2
-RATING_OPTIONS_MAX_ITEMS = 10
-RATING_LOWER_VALUE_ALLOWED = 1
-RATING_UPPER_VALUE_ALLOWED = 10
+RATING_OPTIONS_MAX_ITEMS = 20
+RATING_LOWER_VALUE_ALLOWED = 0
+RATING_UPPER_VALUE_ALLOWED = 100
 
 SPAN_OPTIONS_MIN_ITEMS = 1
 SPAN_OPTIONS_MAX_ITEMS = 500
@@ -117,9 +117,9 @@ class TextQuestionSettingsCreate(BaseModel):
 class TextQuestionSettingsUpdate(UpdateSchema):
     type: Literal[QuestionType.text]
     use_markdown: Optional[bool]
-    use_table: bool = False
+    use_table: Optional[bool]
 
-    __non_nullable_fields__ = {"use_markdown"}
+    __non_nullable_fields__ = {"use_markdown", "use_table"}
 
 
 # Rating question

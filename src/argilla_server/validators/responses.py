@@ -47,7 +47,7 @@ class ResponseValidator:
         question_names = [question.name for question in record.dataset.questions]
 
         for value_question_name in self._response_change.values or []:
-            if value_question_name not in question_names:
+            if value_question_name not in question_names and value_question_name != 'duration':
                 raise ValueError(f"found response value for non configured question with name={value_question_name!r}")
 
     def _validate_values(self, record: Record) -> None:

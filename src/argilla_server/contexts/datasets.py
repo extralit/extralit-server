@@ -49,6 +49,7 @@ from argilla_server.models import (
     Suggestion,
     Vector,
     VectorSettings,
+    Document,
 )
 from argilla_server.models.suggestions import SuggestionCreateWithRecordId
 from argilla_server.schemas.v0.users import User
@@ -79,6 +80,7 @@ from argilla_server.schemas.v1.vector_settings import (
 from argilla_server.schemas.v1.vector_settings import (
     VectorSettingsCreate,
 )
+from argilla_server.schemas.v1.documents import DocumentCreate, DocumentListItem
 from argilla_server.schemas.v1.vectors import Vector as VectorSchema
 from argilla_server.search_engine import SearchEngine
 from argilla_server.validators.responses import (
@@ -371,6 +373,7 @@ async def get_record_by_id(
     with_dataset: bool = False,
     with_suggestions: bool = False,
     with_vectors: bool = False,
+    with_metadata: bool = False,
 ) -> Union[Record, None]:
     query = select(Record).filter_by(id=record_id)
     if with_dataset:
@@ -383,6 +386,9 @@ async def get_record_by_id(
         query = query.options(selectinload(Record.suggestions))
     if with_vectors:
         query = query.options(selectinload(Record.vectors))
+    if with_metadata:
+        query = query.options(selectinload(Record.metadata_))
+
     result = await db.execute(query)
 
     return result.scalar_one_or_none()
@@ -754,9 +760,6 @@ async def _build_record_update(
 
     if record_update.suggestions is not None:
         params.pop("suggestions")
-        questions_ids = [suggestion.question_id for suggestion in record_update.suggestions]
-        if len(questions_ids) != len(set(questions_ids)):
-            raise ValueError("found duplicate suggestions question IDs")
         suggestions = await _build_record_suggestions(db, record, record_update.suggestions, caches["questions"])
 
     if record_update.vectors is not None:
@@ -1000,6 +1003,13 @@ async def update_response(
 ):
     ResponseUpdateValidator(response_update).validate_for(response.record)
 
+    if 'duration' in response.values:
+        if 'duration' in response_update.values:
+            response_update.values['duration'].value = \
+                response.values['duration']['value'] + response_update.values['duration'].value
+        else:
+            response_update.values['duration'] = ResponseValueUpdate(value=response.values['duration']['value'])
+
     async with db.begin_nested():
         response = await response.update(
             db,
@@ -1022,6 +1032,14 @@ async def upsert_response(
     db: "AsyncSession", search_engine: SearchEngine, record: Record, user: User, response_upsert: ResponseUpsert
 ) -> Response:
     ResponseUpsertValidator(response_upsert).validate_for(record)
+
+    if 'duration' in response.values:
+        if 'duration' in response_update.values:
+            response_update.values['duration'].value = \
+                response.values['duration']['value'] + response_update.values['duration'].value
+        else:
+            response_update.values['duration'] = ResponseValueUpdate(value=response.values['duration']['value'])
+
 
     schema = {
         "values": jsonable_encoder(response_upsert.values),
@@ -1174,3 +1192,35 @@ async def get_metadata_property_by_id(db: "AsyncSession", metadata_property_id: 
         select(MetadataProperty).filter_by(id=metadata_property_id).options(selectinload(MetadataProperty.dataset))
     )
     return result.scalar_one_or_none()
+
+async def create_document(db: "AsyncSession", dataset_create: DocumentCreate):
+    return await Document.create(
+        db,
+        url=dataset_create.url,
+        file_data=dataset_create.file_data,
+        file_name=dataset_create.file_name,
+        pmid=dataset_create.pmid,
+        doi=dataset_create.doi,
+        workspace_id=dataset_create.workspace_id,
+)
+
+async def delete_documents(
+    db: "AsyncSession", workspace_id: UUID
+) -> None:
+    async with db.begin_nested():
+        params = [Document.workspace_id == workspace_id]
+        documents = await Document.delete_many(db=db, params=params, autocommit=False)
+
+        print(f"Deleting {len(documents)} documents")
+
+    await db.commit()
+
+async def list_documents(
+    db: "AsyncSession", workspace_id: UUID
+) -> List[DocumentListItem]:
+
+    result = await db.execute(select(Document).filter_by(workspace_id=workspace_id))
+    documents: List[Document] = result.scalars().all()
+    documents = [DocumentListItem(**doc.__dict__) for doc in documents]
+
+    return documents

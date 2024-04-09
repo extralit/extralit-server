@@ -8,16 +8,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, func, or_, select
 
-from argilla.server.database import get_async_db
-from argilla.server.models.database import Document
-from argilla.server.security import auth
-from argilla.server.policies import DocumentPolicy, authorize, is_authorized
-from argilla.server.models import User
-from argilla.server.contexts import accounts, datasets
-from argilla.server.schemas.v1.documents import DocumentCreate, DocumentListItem
+from argilla_server.database import get_async_db
+from argilla_server.models.database import Document
+from argilla_server.security import auth
+from argilla_server.policies import DocumentPolicy, authorize, is_authorized
+from argilla_server.models import User
+from argilla_server.contexts import accounts, datasets
+from argilla_server.schemas.v1.documents import DocumentCreate, DocumentListItem
 
 if TYPE_CHECKING:
-    from argilla.server.models import Document
+    from argilla_server.models import Document
 
 router = APIRouter(tags=["documents"])
 
