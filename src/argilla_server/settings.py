@@ -24,8 +24,9 @@ from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
-from argilla_server.constants import DEFAULT_MAX_KEYWORD_LENGTH, DEFAULT_TELEMETRY_KEY
-from argilla_server.pydantic_v1 import BaseSettings, Field, root_validator, validator
+from pydantic import BaseSettings, Field, root_validator, validator
+
+from argilla._constants import DEFAULT_MAX_KEYWORD_LENGTH, DEFAULT_TELEMETRY_KEY
 
 
 class Settings(BaseSettings):
@@ -90,8 +91,6 @@ class Settings(BaseSettings):
     es_records_index_shards: int = 1
     es_records_index_replicas: int = 0
 
-    es_mapping_total_fields_limit: int = 2000
-
     search_engine: str = "elasticsearch"
 
     vectors_fields_limit: int = Field(
@@ -111,8 +110,8 @@ class Settings(BaseSettings):
         " Values containing higher than this will be truncated",
     )
 
-    # See also the telemetry.py module
     enable_telemetry: bool = True
+
     telemetry_key: str = DEFAULT_TELEMETRY_KEY
 
     @validator("home_path", always=True)
@@ -133,9 +132,16 @@ class Settings(BaseSettings):
     @validator("database_url", pre=True, always=True)
     def set_database_url(cls, database_url: str, values: dict) -> str:
         if not database_url:
-            home_path = values.get("home_path")
-            sqlite_file = os.path.join(home_path, "argilla.db")
-            return f"sqlite+aiosqlite:///{sqlite_file}?check_same_thread=False"
+            database_url = os.getenv("ARGILLA_DATABASE_URL")
+
+        if not database_url:
+            postgres_password = os.getenv("POSTGRES_PASSWORD")
+            postgres_host = os.getenv("POSTGRES_HOST")
+
+            if not postgres_password or not postgres_host:
+                warnings.warn("ARGILLA_DATABASE_URL or POSTGRES_PASSWORD and POSTGRES_HOST environment variables are "
+                              "not set properly, so certain configurations to argilla server may not work as expected.")
+            database_url = f"postgresql+asyncpg://postgres:{postgres_password}@{postgres_host}/postgres"
 
         if "sqlite" in database_url:
             regex = re.compile(r"sqlite(?!\+aiosqlite)")

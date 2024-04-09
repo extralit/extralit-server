@@ -27,8 +27,7 @@ class ResponseStatus(str, Enum):
 
 class ResponseStatusFilter(str, Enum):
     draft = "draft"
-    missing = "missing"  # Deprecated, use pending instead
-    pending = "pending"
+    missing = "missing"
     submitted = "submitted"
     discarded = "discarded"
 
@@ -36,6 +35,7 @@ class ResponseStatusFilter(str, Enum):
 class SuggestionType(str, Enum):
     model = "model"
     human = "human"
+    selection = "selection"
 
 
 class DatasetStatus(str, Enum):
@@ -59,9 +59,10 @@ class QuestionType(str, Enum):
     text = "text"
     rating = "rating"
     label_selection = "label_selection"
+    dynamic_label_selection = "dynamic_label_selection"
     multi_label_selection = "multi_label_selection"
+    dynamic_multi_label_selection = "dynamic_multi_label_selection"
     ranking = "ranking"
-    span = "span"
 
 
 class MetadataPropertyType(str, Enum):

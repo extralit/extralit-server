@@ -17,10 +17,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import async_object_session
 
-from argilla_server.contexts import accounts
-from argilla_server.daos.models.datasets import DatasetDB
-from argilla_server.errors import ForbiddenOperationError
-from argilla_server.models import (
+from argilla.server.contexts import accounts
+from argilla.server.daos.models.datasets import DatasetDB
+from argilla.server.errors import ForbiddenOperationError
+from argilla.server.models import (
     Dataset,
     Field,
     MetadataProperty,
@@ -133,6 +133,36 @@ class UserPolicyV1:
     async def list_workspaces(cls, actor: User) -> bool:
         return actor.is_owner
 
+
+class DocumentPolicy:
+    @classmethod
+    def create(cls) -> PolicyAction:
+        async def is_allowed(actor: User) -> bool:
+            return actor.is_owner or actor.is_admin or actor.is_annotator
+
+        return is_allowed
+    
+    @classmethod
+    def get(cls, ) -> PolicyAction:
+        async def is_allowed(actor: User) -> bool:
+            return actor.is_owner or actor.is_admin or actor.is_annotator
+
+        return is_allowed
+    
+    @classmethod
+    def delete(cls, ) -> PolicyAction:
+        async def is_allowed(actor: User) -> bool:
+            return actor.is_owner
+
+        return is_allowed
+    
+    @classmethod
+    def list(cls, ) -> PolicyAction:
+        async def is_allowed(actor: User) -> bool:
+            return actor.is_owner or actor.is_admin
+
+        return is_allowed
+        
 
 class DatasetPolicy:
     @classmethod
