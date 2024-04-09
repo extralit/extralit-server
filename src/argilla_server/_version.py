@@ -13,4 +13,4 @@
 #  limitations under the License.
 
 # coding: utf-8
-version = "1.27.0-dev"
+__version__ = "1.27.0-dev"

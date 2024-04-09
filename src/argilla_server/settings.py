@@ -26,7 +26,8 @@ from urllib.parse import urlparse
 
 from pydantic import BaseSettings, Field, root_validator, validator
 
-from argilla._constants import DEFAULT_MAX_KEYWORD_LENGTH, DEFAULT_TELEMETRY_KEY
+from argilla_server.constants import DEFAULT_MAX_KEYWORD_LENGTH, DEFAULT_TELEMETRY_KEY
+from argilla_server.pydantic_v1 import BaseSettings, Field, root_validator, validator
 
 
 class Settings(BaseSettings):
@@ -91,6 +92,8 @@ class Settings(BaseSettings):
     es_records_index_shards: int = 1
     es_records_index_replicas: int = 0
 
+    es_mapping_total_fields_limit: int = 2000
+
     search_engine: str = "elasticsearch"
 
     vectors_fields_limit: int = Field(
@@ -110,8 +113,8 @@ class Settings(BaseSettings):
         " Values containing higher than this will be truncated",
     )
 
+    # See also the telemetry.py module
     enable_telemetry: bool = True
-
     telemetry_key: str = DEFAULT_TELEMETRY_KEY
 
     @validator("home_path", always=True)

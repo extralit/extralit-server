@@ -17,10 +17,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import async_object_session
 
-from argilla.server.contexts import accounts
-from argilla.server.daos.models.datasets import DatasetDB
-from argilla.server.errors import ForbiddenOperationError
-from argilla.server.models import (
+from argilla_server.contexts import accounts
+from argilla_server.daos.models.datasets import DatasetDB
+from argilla_server.errors import ForbiddenOperationError
+from argilla_server.models import (
     Dataset,
     Field,
     MetadataProperty,

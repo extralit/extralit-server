@@ -105,16 +105,19 @@ class OptionSettingsCreate(BaseModel):
 class TextQuestionSettings(BaseModel):
     type: Literal[QuestionType.text]
     use_markdown: bool = False
+    use_table: bool = False
 
 
 class TextQuestionSettingsCreate(BaseModel):
     type: Literal[QuestionType.text]
     use_markdown: bool = False
+    use_table: bool = False
 
 
 class TextQuestionSettingsUpdate(UpdateSchema):
     type: Literal[QuestionType.text]
     use_markdown: Optional[bool]
+    use_table: bool = False
 
     __non_nullable_fields__ = {"use_markdown"}
 
@@ -155,13 +158,13 @@ class RatingQuestionSettingsUpdate(UpdateSchema):
 
 # Label selection question
 class LabelSelectionQuestionSettings(BaseModel):
-    type: Literal[QuestionType.label_selection]
+    type: Literal[QuestionType.label_selection, QuestionType.dynamic_label_selection]
     options: List[OptionSettings]
     visible_options: Optional[int] = None
 
 
 class LabelSelectionQuestionSettingsCreate(UniqueValuesCheckerMixin):
-    type: Literal[QuestionType.label_selection]
+    type: Literal[QuestionType.label_selection, QuestionType.dynamic_label_selection]
     options: conlist(
         item_type=OptionSettingsCreate,
         min_items=LABEL_SELECTION_OPTIONS_MIN_ITEMS,
@@ -184,7 +187,7 @@ class LabelSelectionQuestionSettingsCreate(UniqueValuesCheckerMixin):
 
 
 class LabelSelectionSettingsUpdate(UpdateSchema):
-    type: Literal[QuestionType.label_selection]
+    type: Literal[QuestionType.label_selection, QuestionType.dynamic_label_selection]
     visible_options: Optional[int] = Field(None, ge=LABEL_SELECTION_MIN_VISIBLE_OPTIONS)
     options: Optional[
         conlist(
@@ -197,15 +200,15 @@ class LabelSelectionSettingsUpdate(UpdateSchema):
 
 # Multi-label selection question
 class MultiLabelSelectionQuestionSettings(LabelSelectionQuestionSettings):
-    type: Literal[QuestionType.multi_label_selection]
+    type: Literal[QuestionType.multi_label_selection, QuestionType.dynamic_multi_label_selection]
 
 
 class MultiLabelSelectionQuestionSettingsCreate(LabelSelectionQuestionSettingsCreate):
-    type: Literal[QuestionType.multi_label_selection]
+    type: Literal[QuestionType.multi_label_selection, QuestionType.dynamic_multi_label_selection]
 
 
 class MultiLabelSelectionQuestionSettingsUpdate(LabelSelectionSettingsUpdate):
-    type: Literal[QuestionType.multi_label_selection]
+    type: Literal[QuestionType.multi_label_selection, QuestionType.dynamic_multi_label_selection]
 
 
 # Ranking question
