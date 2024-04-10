@@ -40,16 +40,15 @@ docker_build(
     "{DOCKER_REPO}/extralit-argilla-server".format(DOCKER_REPO=DOCKER_REPO),
     context='.',
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
-    dockerfile='./docker/api.dockerfile',
-    only=['./src', './dist', './docker/scripts', './setup.py', './pyproject.toml', './requirements.txt', './scripts/'],
-    ignore=['**/__pycache__', 'src/argilla.egg-info', 'frontend/.nuxt', 'frontend/node_modules', 'frontend/package-lock.json'],
+    dockerfile='./docker/server/api.dockerfile',
+    # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
+    ignore=['**/__pycache__', 'argilla/'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
-        sync('./docker/scripts/start_argilla_server.sh', '/home/argilla/'),
+        sync('./docker/server/scripts/start_argilla_server.sh', '/home/argilla/'),
         # Restart the server to pick up code changes
-        run('/bin/bash start_argilla_server.sh', trigger='./docker/scripts/start_argilla_server.sh'),
-        run('python -m argilla server database migrate', trigger='./src/argilla/server/alembic/versions')
+        run('/bin/bash start_argilla_server.sh', trigger='./docker/server/scripts/start_argilla_server.sh'),
     ]
 )
 argilla_server_k8s_yaml = read_yaml_stream('./k8s/argilla-server-deployment.yaml')
@@ -66,7 +65,7 @@ k8s_yaml([
 k8s_resource(
   'argilla-server-deployment',
   resource_deps=['main-db', 'elasticsearch'],
-  port_forwards=['6901' if 'kind' in k8s_context() else '6900'],
+  port_forwards=['6901:6900' if 'kind' in k8s_context() else '6900'],
   labels=['argilla-server'],
 )
 k8s_yaml(['./k8s/argilla-loadbalancer-service.yaml'])
@@ -79,7 +78,7 @@ helm_resource(
         '--version=13.2.0',
         '--values=./k8s/helm/postgres-helm.yaml'],
     deps=['./k8s/helm/postgres-helm.yaml'],
-    port_forwards=['5433' if 'kind' in k8s_context() else '5432'],
+    port_forwards=['5433:5432' if 'kind' in k8s_context() else '5432'],
     labels=['argilla-server']
 )
 

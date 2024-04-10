@@ -16,6 +16,9 @@ RUN apt-get update && \
 FROM python:3.10.12-slim
 
 # Environment Variables
+ARG ENV=dev
+ENV ENV=$ENV
+
 ENV ARGILLA_HOME_PATH=/var/lib/argilla
 ENV DEFAULT_USER_ENABLED=true
 ENV DEFAULT_USER_PASSWORD=1234
@@ -35,7 +38,7 @@ RUN mkdir -p "$ARGILLA_HOME_PATH" && \
   rm -rf /packages
 VOLUME $ARGILLA_HOME_PATH
 
-COPY scripts/start_argilla_server.sh /home/argilla
+COPY docker/server/scripts/start_argilla_server.sh /home/argilla
 # Destination folder must be the same as the builder one. Otherwise installed script won't work (since the installation fixes the path inside the script)
 COPY --chown=argilla:argilla --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -43,9 +46,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /home/argilla
 RUN chmod +x start_argilla_server.sh
 
+# RUN if [ "$ENV" = "dev" ] ; then pip install -v -e . ; fi
+
 USER argilla
 
 # Exposing ports
 EXPOSE 6900
+
+RUN echo 'export ARGILLA_ELASTICSEARCH=https://elastic:$ELASTIC_PASSWORD@$ARGILLA_ELASTICSEARCH_HOST' >> /home/argilla/.bashrc && \
+  echo 'export ARGILLA_DATABASE_URL=postgresql+asyncpg://postgres:$POSTGRES_PASSWORD@$POSTGRES_HOST/postgres' >> /home/argilla/.bashrc
 
 CMD ["/bin/bash", "start_argilla_server.sh"]

@@ -20,4 +20,6 @@ postgresql:
           operator: In
           values:
           - backend
+  volumePermissions:
+    enabled: true
 

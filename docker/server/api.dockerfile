@@ -28,7 +28,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy the scripts and install uvicorn
-COPY scripts/start_argilla_server.sh /home/argilla/
+COPY docker/server/scripts/start_argilla_server.sh /home/argilla/
 
 
 # Copy the entire repository into /home/argilla in the container
@@ -40,7 +40,7 @@ WORKDIR /home/argilla/
 
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
   pip install -q uvicorn[standard] && \
-  pip install -q -e ".[server,postgresql]"
+  pip install -q -e .
 
 # Conditionally run the command based on ENV
 # RUN if [ "$ENV" = "dev" ]; then pip install --upgrade -e . ; fi
