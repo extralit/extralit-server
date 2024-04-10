@@ -386,8 +386,6 @@ async def get_record_by_id(
         query = query.options(selectinload(Record.suggestions))
     if with_vectors:
         query = query.options(selectinload(Record.vectors))
-    if with_metadata:
-        query = query.options(selectinload(Record.metadata_))
 
     result = await db.execute(query)
 

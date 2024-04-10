@@ -40,9 +40,9 @@ docker_build(
     "{DOCKER_REPO}/extralit-argilla-server".format(DOCKER_REPO=DOCKER_REPO),
     context='.',
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
-    dockerfile='./docker/server/api.dockerfile',
+    dockerfile='./docker/server/dev.dockerfile',
     # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
-    ignore=['**/__pycache__', 'argilla/'],
+    ignore=['**/__pycache__', 'argilla/', '.venv/', '.*'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
