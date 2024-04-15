@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import re
 from typing import Dict, List, Optional, Tuple, Union
 from uuid import UUID
@@ -423,7 +424,7 @@ async def list_current_user_dataset_records(
         user=current_user,
         response_statuses=response_statuses,
         include=include,
-        sort_by_query_param=sort_by_query_param,
+        sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
     )
 
     return Records(items=records, total=total)
@@ -575,7 +576,7 @@ async def search_current_user_dataset_records(
         offset=offset,
         user=current_user,
         response_statuses=response_statuses,
-        sort_by_query_param=sort_by_query_param,
+        sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
     )
 
     record_id_score_map = {
@@ -636,7 +637,7 @@ async def search_dataset_records(
         offset=offset,
         parsed_metadata=metadata.metadata_parsed,
         response_statuses=response_statuses,
-        sort_by_query_param=sort_by_query_param,
+        sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY
     )
 
     record_id_score_map = {
