@@ -1154,6 +1154,7 @@ async def get_suggestion_by_id(db: "AsyncSession", suggestion_id: "UUID") -> Uni
         .options(
             selectinload(Suggestion.record).selectinload(Record.dataset),
             selectinload(Suggestion.question),
+            selectinload(Suggestion.type),
         )
     )
 
@@ -1169,6 +1170,7 @@ async def list_suggestions_by_id_and_record_id(
         .options(
             selectinload(Suggestion.record).selectinload(Record.dataset),
             selectinload(Suggestion.question),
+            selectinload(Suggestion.type),
         )
     )
 

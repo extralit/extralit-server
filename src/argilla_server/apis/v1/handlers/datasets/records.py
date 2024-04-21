@@ -127,7 +127,7 @@ async def _filter_records_using_search_engine(
         user=user,
         parsed_metadata=parsed_metadata,
         response_statuses=response_statuses,
-        sort_by_query_param=sort_by_query_param,
+        sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
     )
 
     record_ids = [response.record_id for response in search_responses.items]

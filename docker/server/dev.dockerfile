@@ -34,15 +34,16 @@ COPY docker/server/scripts/start_argilla_server.sh /home/argilla/
 COPY . /home/argilla/
 
 # Change the ownership of the /home/argilla directory to the new user
-RUN chown -R argilla:argilla /home/argilla
 WORKDIR /home/argilla/
 
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
-  pip install -q uvicorn[standard] && \
-  pip install -q -e ".[postgresql]"
-
+  pip install -qqq uvicorn[standard] && \
+  pip install -qqq -e ".[postgresql]"
+  
 # Conditionally run the command based on ENV
 # RUN if [ "$ENV" = "dev" ]; then pip install --upgrade -e . ; fi
+  
+RUN chown -R argilla:argilla /home/argilla
 
 # Switch to the argilla user
 USER argilla
@@ -52,4 +53,3 @@ EXPOSE 6900
 
 # Set the command for the container
 CMD /bin/bash -c "/bin/bash start_argilla_server.sh"
-

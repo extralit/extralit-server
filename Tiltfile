@@ -42,7 +42,7 @@ docker_build(
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
     dockerfile='./docker/server/dev.dockerfile',
     # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
-    ignore=['**/__pycache__', 'argilla/', '.venv/', '.*'],
+    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
@@ -70,6 +70,7 @@ k8s_resource(
 )
 k8s_yaml(['./k8s/argilla-loadbalancer-service.yaml'])
 
+
 # PostgreSQL is the database for argilla-server
 helm_resource(
     name='main-db', 
@@ -81,6 +82,39 @@ helm_resource(
     port_forwards=['5433:5432' if 'kind' in k8s_context() else '5432'],
     labels=['argilla-server']
 )
+
+
+# Langfuse Observability server
+k8s_yaml('./k8s/langfuse-deployment.yaml')
+k8s_resource(
+  'langfuse-deployment',
+  port_forwards=['4000'],
+  labels=['langfuse'],
+)
+
+
+# Aimstack Observability server
+# docker_build(
+#     "{DOCKER_REPO}/extralit-aim-server".format(DOCKER_REPO=DOCKER_REPO),
+#     context='.',
+#     dockerfile='./docker/services/aim.dockerfile',
+#     only=['./docker/services/'],
+# )
+# aim_server_k8s_yaml = read_yaml_stream('./k8s/aim-server-deployment.yaml')
+# for o in aim_server_k8s_yaml:
+#     for container in o['spec']['template']['spec']['containers']:
+#         print(container['name'])
+#         if container['name'] == 'aim-server':
+#             container['image'] = "{DOCKER_REPO}/extralit-aim-server".format(DOCKER_REPO=DOCKER_REPO)
+# k8s_yaml([
+#     encode_yaml_stream(aim_server_k8s_yaml), 
+#     './k8s/aim-server-service.yaml', 
+#     ])
+# k8s_resource(
+#   'aim-deployment',
+#   port_forwards=['53800:43800'],
+#   labels=['aim-observability'],
+# )
 
 
 # Add the MinIO Helm repository

@@ -3,6 +3,7 @@ global:
 
 nameOverride: "main-db"
 fullnameOverride: "main-db"
+# Rename to `extralit-db` and change the default database name to `extralit-db`
 
 postgresql:
   persistence:
