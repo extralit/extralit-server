@@ -37,8 +37,9 @@ COPY . /home/argilla/
 WORKDIR /home/argilla/
 
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
-  pip install -qqq uvicorn[standard] && \
-  pip install -qqq -e ".[postgresql]"
+  pip install -q uv && \
+  uv install -qqq uvicorn[standard] && \
+  uv install -qqq -e ".[postgresql]"
   
 # Conditionally run the command based on ENV
 # RUN if [ "$ENV" = "dev" ]; then pip install --upgrade -e . ; fi
