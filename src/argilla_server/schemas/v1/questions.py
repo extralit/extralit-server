@@ -20,6 +20,7 @@ from argilla_server.models import QuestionType
 from argilla_server.pydantic_v1 import BaseModel, Field, conlist, constr, root_validator, validator
 from argilla_server.schemas.base import UpdateSchema
 from argilla_server.schemas.v1.fields import FieldName
+from argilla_server.settings import settings
 
 try:
     from typing import Annotated
@@ -57,7 +58,6 @@ RATING_LOWER_VALUE_ALLOWED = 0
 RATING_UPPER_VALUE_ALLOWED = 100
 
 SPAN_OPTIONS_MIN_ITEMS = 1
-SPAN_OPTIONS_MAX_ITEMS = 500
 SPAN_MIN_VISIBLE_OPTIONS = 3
 
 
@@ -168,7 +168,7 @@ class LabelSelectionQuestionSettingsCreate(UniqueValuesCheckerMixin):
     options: conlist(
         item_type=OptionSettingsCreate,
         min_items=LABEL_SELECTION_OPTIONS_MIN_ITEMS,
-        max_items=LABEL_SELECTION_OPTIONS_MAX_ITEMS,
+        max_items=settings.label_selection_options_max_items,
     )
     visible_options: Optional[int] = Field(None, ge=LABEL_SELECTION_MIN_VISIBLE_OPTIONS)
 
@@ -193,7 +193,7 @@ class LabelSelectionSettingsUpdate(UpdateSchema):
         conlist(
             item_type=OptionSettings,
             min_items=LABEL_SELECTION_OPTIONS_MIN_ITEMS,
-            max_items=LABEL_SELECTION_OPTIONS_MAX_ITEMS,
+            max_items=settings.label_selection_options_max_items,
         )
     ]
 
@@ -247,9 +247,10 @@ class SpanQuestionSettingsCreate(UniqueValuesCheckerMixin):
     options: conlist(
         item_type=OptionSettingsCreate,
         min_items=SPAN_OPTIONS_MIN_ITEMS,
-        max_items=SPAN_OPTIONS_MAX_ITEMS,
+        max_items=settings.span_options_max_items,
     )
     visible_options: Optional[int] = Field(None, ge=SPAN_MIN_VISIBLE_OPTIONS)
+    allow_overlapping: bool = False
 
     @root_validator(skip_on_failure=True)
     def check_visible_options_value(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -271,10 +272,11 @@ class SpanQuestionSettingsUpdate(UpdateSchema):
         conlist(
             item_type=OptionSettings,
             min_items=SPAN_OPTIONS_MIN_ITEMS,
-            max_items=SPAN_OPTIONS_MAX_ITEMS,
+            max_items=settings.span_options_max_items,
         )
     ]
     visible_options: Optional[int] = Field(None, ge=SPAN_MIN_VISIBLE_OPTIONS)
+    allow_overlapping: Optional[bool]
 
 
 QuestionSettings = Annotated[

@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import asyncio
 import copy
 from datetime import datetime
 from typing import (
@@ -32,7 +33,8 @@ from uuid import UUID
 
 import sqlalchemy
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
 import argilla_server.errors.future as errors
@@ -55,10 +57,10 @@ from argilla_server.models.suggestions import SuggestionCreateWithRecordId
 from argilla_server.schemas.v0.users import User
 from argilla_server.schemas.v1.datasets import (
     DatasetCreate,
+    DatasetProgress,
 )
 from argilla_server.schemas.v1.fields import FieldCreate
 from argilla_server.schemas.v1.metadata_properties import MetadataPropertyCreate, MetadataPropertyUpdate
-from argilla_server.schemas.v1.questions import QuestionCreate
 from argilla_server.schemas.v1.records import (
     RecordCreate,
     RecordIncludeParam,
@@ -70,8 +72,6 @@ from argilla_server.schemas.v1.responses import (
     ResponseCreate,
     ResponseUpdate,
     ResponseUpsert,
-    ResponseValueCreate,
-    ResponseValueUpdate,
     UserResponseCreate,
 )
 from argilla_server.schemas.v1.vector_settings import (
@@ -91,13 +91,10 @@ from argilla_server.validators.responses import (
 from argilla_server.validators.suggestions import SuggestionCreateValidator
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
     from argilla_server.schemas.v1.datasets import (
         DatasetUpdate,
     )
     from argilla_server.schemas.v1.fields import FieldUpdate
-    from argilla_server.schemas.v1.questions import QuestionUpdate
     from argilla_server.schemas.v1.records import RecordUpdate
     from argilla_server.schemas.v1.suggestions import SuggestionCreate
     from argilla_server.schemas.v1.vector_settings import VectorSettingsUpdate
@@ -108,14 +105,14 @@ VISIBLE_FOR_ANNOTATORS_ALLOWED_ROLES = [UserRole.admin, UserRole.annotator]
 NOT_VISIBLE_FOR_ANNOTATORS_ALLOWED_ROLES = [UserRole.admin]
 
 
-async def _touch_dataset_last_activity_at(db: "AsyncSession", dataset: Dataset) -> None:
+async def _touch_dataset_last_activity_at(db: AsyncSession, dataset: Dataset) -> None:
     await db.execute(
         sqlalchemy.update(Dataset).where(Dataset.id == dataset.id).values(last_activity_at=datetime.utcnow())
     )
 
 
 async def get_dataset_by_id(
-    db: "AsyncSession",
+    db: AsyncSession,
     dataset_id: UUID,
     with_fields: bool = False,
     with_questions: bool = False,
@@ -141,26 +138,24 @@ async def get_dataset_by_id(
     return result.scalar_one_or_none()
 
 
-async def get_dataset_by_name_and_workspace_id(
-    db: "AsyncSession", name: str, workspace_id: UUID
-) -> Union[Dataset, None]:
+async def get_dataset_by_name_and_workspace_id(db: AsyncSession, name: str, workspace_id: UUID) -> Union[Dataset, None]:
     result = await db.execute(select(Dataset).filter_by(name=name, workspace_id=workspace_id))
     return result.scalar_one_or_none()
 
 
-async def list_datasets(db: "AsyncSession") -> List[Dataset]:
+async def list_datasets(db: AsyncSession) -> List[Dataset]:
     result = await db.execute(select(Dataset).order_by(Dataset.inserted_at.asc()))
     return result.scalars().all()
 
 
-async def list_datasets_by_workspace_id(db: "AsyncSession", workspace_id: UUID) -> List[Dataset]:
+async def list_datasets_by_workspace_id(db: AsyncSession, workspace_id: UUID) -> List[Dataset]:
     result = await db.execute(
         select(Dataset).where(Dataset.workspace_id == workspace_id).order_by(Dataset.inserted_at.asc())
     )
     return result.scalars().all()
 
 
-async def create_dataset(db: "AsyncSession", dataset_create: DatasetCreate):
+async def create_dataset(db: AsyncSession, dataset_create: DatasetCreate):
     return await Dataset.create(
         db,
         name=dataset_create.name,
@@ -170,11 +165,11 @@ async def create_dataset(db: "AsyncSession", dataset_create: DatasetCreate):
     )
 
 
-async def _count_required_fields_by_dataset_id(db: "AsyncSession", dataset_id: UUID) -> int:
+async def _count_required_fields_by_dataset_id(db: AsyncSession, dataset_id: UUID) -> int:
     return (await db.execute(select(func.count(Field.id)).filter_by(dataset_id=dataset_id, required=True))).scalar_one()
 
 
-async def _count_required_questions_by_dataset_id(db: "AsyncSession", dataset_id: UUID) -> int:
+async def _count_required_questions_by_dataset_id(db: AsyncSession, dataset_id: UUID) -> int:
     return (
         await db.execute(select(func.count(Question.id)).filter_by(dataset_id=dataset_id, required=True))
     ).scalar_one()
@@ -187,7 +182,7 @@ def _allowed_roles_for_metadata_property_create(metadata_property_create: Metada
         return NOT_VISIBLE_FOR_ANNOTATORS_ALLOWED_ROLES
 
 
-async def publish_dataset(db: "AsyncSession", search_engine: SearchEngine, dataset: Dataset) -> Dataset:
+async def publish_dataset(db: AsyncSession, search_engine: SearchEngine, dataset: Dataset) -> Dataset:
     if dataset.is_ready:
         raise ValueError("Dataset is already published")
 
@@ -206,7 +201,7 @@ async def publish_dataset(db: "AsyncSession", search_engine: SearchEngine, datas
     return dataset
 
 
-async def delete_dataset(db: "AsyncSession", search_engine: SearchEngine, dataset: Dataset) -> Dataset:
+async def delete_dataset(db: AsyncSession, search_engine: SearchEngine, dataset: Dataset) -> Dataset:
     async with db.begin_nested():
         dataset = await dataset.delete(db, autocommit=False)
         await search_engine.delete_index(dataset)
@@ -216,22 +211,22 @@ async def delete_dataset(db: "AsyncSession", search_engine: SearchEngine, datase
     return dataset
 
 
-async def update_dataset(db: "AsyncSession", dataset: Dataset, dataset_update: "DatasetUpdate") -> Dataset:
+async def update_dataset(db: AsyncSession, dataset: Dataset, dataset_update: "DatasetUpdate") -> Dataset:
     params = dataset_update.dict(exclude_unset=True)
     return await dataset.update(db, **params)
 
 
-async def get_field_by_id(db: "AsyncSession", field_id: UUID) -> Union[Field, None]:
+async def get_field_by_id(db: AsyncSession, field_id: UUID) -> Union[Field, None]:
     result = await db.execute(select(Field).filter_by(id=field_id).options(selectinload(Field.dataset)))
     return result.scalar_one_or_none()
 
 
-async def get_field_by_name_and_dataset_id(db: "AsyncSession", name: str, dataset_id: UUID) -> Union[Field, None]:
+async def get_field_by_name_and_dataset_id(db: AsyncSession, name: str, dataset_id: UUID) -> Union[Field, None]:
     result = await db.execute(select(Field).filter_by(name=name, dataset_id=dataset_id))
     return result.scalar_one_or_none()
 
 
-async def create_field(db: "AsyncSession", dataset: Dataset, field_create: FieldCreate) -> Field:
+async def create_field(db: AsyncSession, dataset: Dataset, field_create: FieldCreate) -> Field:
     if dataset.is_ready:
         raise ValueError("Field cannot be created for a published dataset")
 
@@ -245,12 +240,12 @@ async def create_field(db: "AsyncSession", dataset: Dataset, field_create: Field
     )
 
 
-async def update_field(db: "AsyncSession", field: Field, field_update: "FieldUpdate") -> Field:
+async def update_field(db: AsyncSession, field: Field, field_update: "FieldUpdate") -> Field:
     params = field_update.dict(exclude_unset=True)
     return await field.update(db, **params)
 
 
-async def delete_field(db: "AsyncSession", field: Field) -> Field:
+async def delete_field(db: AsyncSession, field: Field) -> Field:
     if field.dataset.is_ready:
         raise ValueError("Fields cannot be deleted for a published dataset")
 
@@ -258,7 +253,7 @@ async def delete_field(db: "AsyncSession", field: Field) -> Field:
 
 
 async def get_metadata_property_by_name_and_dataset_id(
-    db: "AsyncSession", name: str, dataset_id: UUID
+    db: AsyncSession, name: str, dataset_id: UUID
 ) -> Union[MetadataProperty, None]:
     result = await db.execute(select(MetadataProperty).filter_by(name=name, dataset_id=dataset_id))
 
@@ -266,7 +261,7 @@ async def get_metadata_property_by_name_and_dataset_id(
 
 
 async def get_metadata_property_by_name_and_dataset_id_or_raise(
-    db: "AsyncSession", name: str, dataset_id: UUID
+    db: AsyncSession, name: str, dataset_id: UUID
 ) -> MetadataProperty:
     metadata_property = await get_metadata_property_by_name_and_dataset_id(db, name, dataset_id)
     if metadata_property is None:
@@ -275,12 +270,12 @@ async def get_metadata_property_by_name_and_dataset_id_or_raise(
     return metadata_property
 
 
-async def delete_metadata_property(db: "AsyncSession", metadata_property: MetadataProperty) -> MetadataProperty:
+async def delete_metadata_property(db: AsyncSession, metadata_property: MetadataProperty) -> MetadataProperty:
     return await metadata_property.delete(db)
 
 
 async def create_metadata_property(
-    db: "AsyncSession",
+    db: AsyncSession,
     search_engine: "SearchEngine",
     dataset: Dataset,
     metadata_property_create: MetadataPropertyCreate,
@@ -305,7 +300,7 @@ async def create_metadata_property(
 
 
 async def update_metadata_property(
-    db: "AsyncSession",
+    db: AsyncSession,
     metadata_property: MetadataProperty,
     metadata_property_update: MetadataPropertyUpdate,
 ):
@@ -316,11 +311,11 @@ async def update_metadata_property(
     )
 
 
-async def count_vectors_settings_by_dataset_id(db: "AsyncSession", dataset_id: UUID) -> int:
+async def count_vectors_settings_by_dataset_id(db: AsyncSession, dataset_id: UUID) -> int:
     return (await db.execute(select(func.count(VectorSettings.id)).filter_by(dataset_id=dataset_id))).scalar_one()
 
 
-async def get_vector_settings_by_id(db: "AsyncSession", vector_settings_id: UUID) -> Union[VectorSettings, None]:
+async def get_vector_settings_by_id(db: AsyncSession, vector_settings_id: UUID) -> Union[VectorSettings, None]:
     result = await db.execute(
         select(VectorSettings).filter_by(id=vector_settings_id).options(selectinload(VectorSettings.dataset))
     )
@@ -328,25 +323,25 @@ async def get_vector_settings_by_id(db: "AsyncSession", vector_settings_id: UUID
 
 
 async def get_vector_settings_by_name_and_dataset_id(
-    db: "AsyncSession", name: str, dataset_id: UUID
+    db: AsyncSession, name: str, dataset_id: UUID
 ) -> Union[VectorSettings, None]:
     return await VectorSettings.read_by(db, name=name, dataset_id=dataset_id)
 
 
 async def update_vector_settings(
-    db: "AsyncSession", vector_settings: VectorSettings, vector_settings_update: "VectorSettingsUpdate"
+    db: AsyncSession, vector_settings: VectorSettings, vector_settings_update: "VectorSettingsUpdate"
 ) -> VectorSettings:
     params = vector_settings_update.dict(exclude_unset=True)
     return await vector_settings.update(db, **params)
 
 
-async def delete_vector_settings(db: "AsyncSession", vector_settings: VectorSettings) -> VectorSettings:
+async def delete_vector_settings(db: AsyncSession, vector_settings: VectorSettings) -> VectorSettings:
     # TODO: for now the search engine does not allow to delete vector settings
     return await vector_settings.delete(db)
 
 
 async def create_vector_settings(
-    db: "AsyncSession", search_engine: "SearchEngine", dataset: Dataset, vector_settings_create: "VectorSettingsCreate"
+    db: AsyncSession, search_engine: "SearchEngine", dataset: Dataset, vector_settings_create: "VectorSettingsCreate"
 ) -> VectorSettings:
     async with db.begin_nested():
         vector_settings = await VectorSettings.create(
@@ -368,7 +363,7 @@ async def create_vector_settings(
 
 
 async def get_record_by_id(
-    db: "AsyncSession",
+    db: AsyncSession,
     record_id: UUID,
     with_dataset: bool = False,
     with_suggestions: bool = False,
@@ -393,7 +388,7 @@ async def get_record_by_id(
 
 
 async def get_records_by_ids(
-    db: "AsyncSession",
+    db: AsyncSession,
     records_ids: Iterable[UUID],
     dataset_id: Optional[UUID] = None,
     include: Optional["RecordIncludeParam"] = None,
@@ -449,15 +444,46 @@ async def _configure_query_relationships(
     return query
 
 
-async def count_records_by_dataset_id(db: "AsyncSession", dataset_id: UUID) -> int:
+async def count_records_by_dataset_id(db: AsyncSession, dataset_id: UUID) -> int:
     return (await db.execute(select(func.count(Record.id)).filter_by(dataset_id=dataset_id))).scalar_one()
+
+
+async def get_dataset_progress(db: AsyncSession, dataset_id: UUID) -> DatasetProgress:
+    submitted_case = case((Response.status == ResponseStatus.submitted, 1), else_=0)
+    discarded_case = case((Response.status == ResponseStatus.discarded, 1), else_=0)
+
+    submitted_clause = func.sum(submitted_case) > 0, func.sum(discarded_case) == 0
+    discarded_clause = func.sum(discarded_case) > 0, func.sum(submitted_case) == 0
+    conflicting_clause = func.sum(submitted_case) > 0, func.sum(discarded_case) > 0
+
+    query = select(Record.id).join(Response).filter(Record.dataset_id == dataset_id).group_by(Record.id)
+
+    total, submitted, discarded, conflicting = await asyncio.gather(
+        count_records_by_dataset_id(db, dataset_id),
+        db.execute(select(func.count("*")).select_from(query.having(*submitted_clause))),
+        db.execute(select(func.count("*")).select_from(query.having(*discarded_clause))),
+        db.execute(select(func.count("*")).select_from(query.having(*conflicting_clause))),
+    )
+
+    submitted = submitted.scalar_one()
+    discarded = discarded.scalar_one()
+    conflicting = conflicting.scalar_one()
+    pending = total - submitted - discarded - conflicting
+
+    return DatasetProgress(
+        total=total,
+        submitted=submitted,
+        discarded=discarded,
+        conflicting=conflicting,
+        pending=pending,
+    )
 
 
 _EXTRA_METADATA_FLAG = "extra"
 
 
 async def _validate_metadata(
-    db: "AsyncSession",
+    db: AsyncSession,
     dataset: Dataset,
     metadata: Dict[str, Any],
     metadata_properties: Optional[Dict[str, Union[MetadataProperty, Literal["extra"]]]] = None,
@@ -497,7 +523,7 @@ async def _validate_metadata(
     return metadata_properties
 
 
-async def validate_user_exists(db: "AsyncSession", user_id: UUID, users_ids: Optional[Set[UUID]]) -> Set[UUID]:
+async def validate_user_exists(db: AsyncSession, user_id: UUID, users_ids: Optional[Set[UUID]]) -> Set[UUID]:
     if not users_ids:
         users_ids = set()
 
@@ -510,7 +536,7 @@ async def validate_user_exists(db: "AsyncSession", user_id: UUID, users_ids: Opt
 
 
 async def _validate_vector(
-    db: "AsyncSession",
+    db: AsyncSession,
     dataset_id: UUID,
     vector_name: str,
     vector_value: List[float],
@@ -534,7 +560,7 @@ async def _validate_vector(
 
 
 async def _build_record(
-    db: "AsyncSession", dataset: Dataset, record_create: RecordCreate, caches: Dict[str, Any]
+    db: AsyncSession, dataset: Dataset, record_create: RecordCreate, caches: Dict[str, Any]
 ) -> Record:
     _validate_record_fields(dataset, fields=record_create.fields)
     await _validate_record_metadata(db, dataset, record_create.metadata, caches["metadata_properties_cache"])
@@ -548,7 +574,7 @@ async def _build_record(
 
 
 async def create_records(
-    db: "AsyncSession", search_engine: SearchEngine, dataset: Dataset, records_create: RecordsCreate
+    db: AsyncSession, search_engine: SearchEngine, dataset: Dataset, records_create: RecordsCreate
 ):
     if not dataset.is_ready:
         raise ValueError("Records cannot be created for a non published dataset")
@@ -613,7 +639,7 @@ async def _load_users_from_record_responses(records: Iterable[Record]) -> None:
 
 
 async def _validate_record_metadata(
-    db: "AsyncSession",
+    db: AsyncSession,
     dataset: Dataset,
     metadata: Optional[Dict[str, Any]] = None,
     cache: Dict[str, Union[MetadataProperty, Literal["extra"]]] = {},
@@ -630,7 +656,7 @@ async def _validate_record_metadata(
 
 
 async def _build_record_responses(
-    db: "AsyncSession",
+    db: AsyncSession,
     record: Record,
     responses_create: Optional[List[UserResponseCreate]],
     cache: Optional[Set[UUID]] = None,
@@ -662,7 +688,7 @@ async def _build_record_responses(
 
 
 async def _build_record_suggestions(
-    db: "AsyncSession",
+    db: AsyncSession,
     record: Record,
     suggestions_create: Optional[List["SuggestionCreate"]],
     questions_cache: Optional[Dict[UUID, Question]] = None,
@@ -707,7 +733,7 @@ VectorClass = TypeVar("VectorClass")
 
 
 async def _build_record_vectors(
-    db: "AsyncSession",
+    db: AsyncSession,
     dataset: Dataset,
     vectors_dict: Dict[str, List[float]],
     build_vector_func: Callable[[List[float], UUID], VectorClass],
@@ -728,13 +754,13 @@ async def _build_record_vectors(
     return vectors
 
 
-async def _exists_records_with_ids(db: "AsyncSession", dataset_id: UUID, records_ids: List[UUID]) -> List[UUID]:
+async def _exists_records_with_ids(db: AsyncSession, dataset_id: UUID, records_ids: List[UUID]) -> List[UUID]:
     result = await db.execute(select(Record.id).filter(Record.dataset_id == dataset_id, Record.id.in_(records_ids)))
     return result.scalars().all()
 
 
 async def _build_record_update(
-    db: "AsyncSession", record: Record, record_update: "RecordUpdateWithId", caches: Optional[Dict[str, Any]] = None
+    db: AsyncSession, record: Record, record_update: "RecordUpdateWithId", caches: Optional[Dict[str, Any]] = None
 ) -> Tuple[Dict[str, Any], Union[List[Suggestion], None], List[VectorSchema], bool, Dict[str, Any]]:
     if caches is None:
         caches = {
@@ -776,12 +802,12 @@ async def _build_record_update(
     return params, suggestions, vectors, needs_search_engine_update, caches
 
 
-async def _preload_records_relationships_before_index(db: "AsyncSession", records: List[Record]) -> None:
+async def _preload_records_relationships_before_index(db: AsyncSession, records: List[Record]) -> None:
     for record in records:
         await _preload_record_relationships_before_index(db, record)
 
 
-async def _preload_record_relationships_before_index(db: "AsyncSession", record: Record) -> None:
+async def _preload_record_relationships_before_index(db: AsyncSession, record: Record) -> None:
     await db.execute(
         select(Record)
         .filter_by(id=record.id)
@@ -793,7 +819,7 @@ async def _preload_record_relationships_before_index(db: "AsyncSession", record:
     )
 
 
-async def preload_records_relationships_before_validate(db: "AsyncSession", records: List[Record]) -> None:
+async def preload_records_relationships_before_validate(db: AsyncSession, records: List[Record]) -> None:
     await db.execute(
         select(Record)
         .filter(Record.id.in_([record.id for record in records]))
@@ -804,7 +830,7 @@ async def preload_records_relationships_before_validate(db: "AsyncSession", reco
 
 
 async def update_records(
-    db: "AsyncSession", search_engine: "SearchEngine", dataset: Dataset, records_update: "RecordsUpdate"
+    db: AsyncSession, search_engine: "SearchEngine", dataset: Dataset, records_update: "RecordsUpdate"
 ) -> None:
     records_ids = [record_update.id for record_update in records_update.items]
 
@@ -890,7 +916,7 @@ async def update_records(
 
 
 async def delete_records(
-    db: "AsyncSession", search_engine: "SearchEngine", dataset: Dataset, records_ids: List[UUID]
+    db: AsyncSession, search_engine: "SearchEngine", dataset: Dataset, records_ids: List[UUID]
 ) -> None:
     async with db.begin_nested():
         params = [Record.id.in_(records_ids), Record.dataset_id == dataset.id]
@@ -901,7 +927,7 @@ async def delete_records(
 
 
 async def update_record(
-    db: "AsyncSession", search_engine: "SearchEngine", record: Record, record_update: "RecordUpdate"
+    db: AsyncSession, search_engine: "SearchEngine", record: Record, record_update: "RecordUpdate"
 ) -> Record:
     params, suggestions, vectors, needs_search_engine_update, _ = await _build_record_update(
         db, record, RecordUpdateWithId(id=record.id, **record_update.dict(by_alias=True, exclude_unset=True))
@@ -930,7 +956,7 @@ async def update_record(
     return record
 
 
-async def delete_record(db: "AsyncSession", search_engine: "SearchEngine", record: Record) -> Record:
+async def delete_record(db: AsyncSession, search_engine: "SearchEngine", record: Record) -> Record:
     async with db.begin_nested():
         record = await record.delete(db=db, autocommit=False)
         await search_engine.delete_records(dataset=record.dataset, records=[record])
@@ -940,7 +966,7 @@ async def delete_record(db: "AsyncSession", search_engine: "SearchEngine", recor
     return record
 
 
-async def get_response_by_id(db: "AsyncSession", response_id: UUID) -> Union[Response, None]:
+async def get_response_by_id(db: AsyncSession, response_id: UUID) -> Union[Response, None]:
     result = await db.execute(
         select(Response)
         .filter_by(id=response_id)
@@ -950,14 +976,14 @@ async def get_response_by_id(db: "AsyncSession", response_id: UUID) -> Union[Res
 
 
 async def get_response_by_record_id_and_user_id(
-    db: "AsyncSession", record_id: UUID, user_id: UUID
+    db: AsyncSession, record_id: UUID, user_id: UUID
 ) -> Union[Response, None]:
     result = await db.execute(select(Response).filter_by(record_id=record_id, user_id=user_id))
     return result.scalar_one_or_none()
 
 
 async def count_responses_by_dataset_id_and_user_id(
-    db: "AsyncSession", dataset_id: UUID, user_id: UUID, response_status: Optional[ResponseStatus] = None
+    db: AsyncSession, dataset_id: UUID, user_id: UUID, response_status: Optional[ResponseStatus] = None
 ) -> int:
     expressions = [Response.user_id == user_id]
     if response_status:
@@ -973,7 +999,7 @@ async def count_responses_by_dataset_id_and_user_id(
 
 
 async def create_response(
-    db: "AsyncSession", search_engine: SearchEngine, record: Record, user: User, response_create: ResponseCreate
+    db: AsyncSession, search_engine: SearchEngine, record: Record, user: User, response_create: ResponseCreate
 ) -> Response:
     ResponseCreateValidator(response_create).validate_for(record)
 
@@ -997,7 +1023,7 @@ async def create_response(
 
 
 async def update_response(
-    db: "AsyncSession", search_engine: SearchEngine, response: Response, response_update: ResponseUpdate
+    db: AsyncSession, search_engine: SearchEngine, response: Response, response_update: ResponseUpdate
 ):
     ResponseUpdateValidator(response_update).validate_for(response.record)
 
@@ -1027,7 +1053,7 @@ async def update_response(
 
 
 async def upsert_response(
-    db: "AsyncSession", search_engine: SearchEngine, record: Record, user: User, response_upsert: ResponseUpsert
+    db: AsyncSession, search_engine: SearchEngine, record: Record, user: User, response_upsert: ResponseUpsert
 ) -> Response:
     ResponseUpsertValidator(response_upsert).validate_for(record)
 
@@ -1063,7 +1089,7 @@ async def upsert_response(
     return response
 
 
-async def delete_response(db: "AsyncSession", search_engine: SearchEngine, response: Response) -> Response:
+async def delete_response(db: AsyncSession, search_engine: SearchEngine, response: Response) -> Response:
     async with db.begin_nested():
         response = await response.delete(db, autocommit=False)
         await _load_users_from_responses(response)
@@ -1092,13 +1118,13 @@ def _validate_record_fields(dataset: Dataset, fields: Dict[str, Any]):
 
 
 async def get_suggestion_by_record_id_and_question_id(
-    db: "AsyncSession", record_id: UUID, question_id: UUID
+    db: AsyncSession, record_id: UUID, question_id: UUID
 ) -> Union[Suggestion, None]:
     result = await db.execute(select(Suggestion).filter_by(record_id=record_id, question_id=question_id))
     return result.scalar_one_or_none()
 
 
-async def _preload_suggestion_relationships_before_index(db: "AsyncSession", suggestion: Suggestion) -> None:
+async def _preload_suggestion_relationships_before_index(db: AsyncSession, suggestion: Suggestion) -> None:
     await db.execute(
         select(Suggestion)
         .filter_by(id=suggestion.id)
@@ -1110,7 +1136,7 @@ async def _preload_suggestion_relationships_before_index(db: "AsyncSession", sug
 
 
 async def upsert_suggestion(
-    db: "AsyncSession",
+    db: AsyncSession,
     search_engine: SearchEngine,
     record: Record,
     question: Question,
@@ -1134,7 +1160,7 @@ async def upsert_suggestion(
 
 
 async def delete_suggestions(
-    db: "AsyncSession", search_engine: SearchEngine, record: Record, suggestions_ids: List[UUID]
+    db: AsyncSession, search_engine: SearchEngine, record: Record, suggestions_ids: List[UUID]
 ) -> None:
     params = [Suggestion.id.in_(suggestions_ids), Suggestion.record_id == record.id]
     suggestions = await list_suggestions_by_id_and_record_id(db, suggestions_ids, record.id)
@@ -1147,7 +1173,7 @@ async def delete_suggestions(
     await db.commit()
 
 
-async def get_suggestion_by_id(db: "AsyncSession", suggestion_id: "UUID") -> Union[Suggestion, None]:
+async def get_suggestion_by_id(db: AsyncSession, suggestion_id: "UUID") -> Union[Suggestion, None]:
     result = await db.execute(
         select(Suggestion)
         .filter_by(id=suggestion_id)
@@ -1162,7 +1188,7 @@ async def get_suggestion_by_id(db: "AsyncSession", suggestion_id: "UUID") -> Uni
 
 
 async def list_suggestions_by_id_and_record_id(
-    db: "AsyncSession", suggestion_ids: List[UUID], record_id: UUID
+    db: AsyncSession, suggestion_ids: List[UUID], record_id: UUID
 ) -> Sequence[Suggestion]:
     result = await db.execute(
         select(Suggestion)
@@ -1177,7 +1203,7 @@ async def list_suggestions_by_id_and_record_id(
     return result.scalars().all()
 
 
-async def delete_suggestion(db: "AsyncSession", search_engine: SearchEngine, suggestion: Suggestion) -> Suggestion:
+async def delete_suggestion(db: AsyncSession, search_engine: SearchEngine, suggestion: Suggestion) -> Suggestion:
     async with db.begin_nested():
         suggestion = await suggestion.delete(db, autocommit=False)
         await search_engine.delete_record_suggestion(suggestion)
@@ -1187,7 +1213,7 @@ async def delete_suggestion(db: "AsyncSession", search_engine: SearchEngine, sug
     return suggestion
 
 
-async def get_metadata_property_by_id(db: "AsyncSession", metadata_property_id: UUID) -> Optional[MetadataProperty]:
+async def get_metadata_property_by_id(db: AsyncSession, metadata_property_id: UUID) -> Optional[MetadataProperty]:
     result = await db.execute(
         select(MetadataProperty).filter_by(id=metadata_property_id).options(selectinload(MetadataProperty.dataset))
     )
