@@ -11,6 +11,13 @@ class DocumentCreate(BaseModel):
     workspace_id: UUID  # The workspace ID to which the document belongs to
     id: Optional[UUID]
 
+class DocumentDelete(BaseModel):
+    url: Optional[str] = None
+    id: Optional[Union[UUID, str]] = None
+    pmid: Optional[str] = None
+    doi: Optional[str] = None
+
+
 class DocumentListItem(BaseModel):
     id: UUID
     url: Optional[str]

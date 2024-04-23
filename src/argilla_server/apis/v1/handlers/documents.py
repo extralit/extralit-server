@@ -3,7 +3,7 @@ from io import BytesIO
 from uuid import UUID
 from typing import TYPE_CHECKING, Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, Path, status, Security
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, Path, status, Security
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, func, or_, select
@@ -14,7 +14,7 @@ from argilla_server.security import auth
 from argilla_server.policies import DocumentPolicy, authorize, is_authorized
 from argilla_server.models import User
 from argilla_server.contexts import accounts, datasets
-from argilla_server.schemas.v1.documents import DocumentCreate, DocumentListItem
+from argilla_server.schemas.v1.documents import DocumentCreate, DocumentDelete, DocumentListItem
 
 if TYPE_CHECKING:
     from argilla_server.models import Document
@@ -30,15 +30,20 @@ async def check_existing_document(db: AsyncSession, document_create: DocumentCre
         conditions.append(Document.url == document_create.url)
     if document_create.doi:
         conditions.append(Document.doi == document_create.doi)
-    if document_create.file_name:
-        conditions.append(Document.file_name == document_create.file_name)
+    if document_create.id:
+        conditions.append(Document.id == document_create.id)
 
     if not conditions:
         return None
 
     # Check if a document with the same pmid, url, or doi already exists
     existing_document = await db.execute(
-        select(Document).where(or_(*conditions))
+        select(Document).where(
+            and_(
+                Document.workspace_id == document_create.workspace_id,
+                or_(*conditions)
+            )
+        )
     )
     existing_document = existing_document.scalars().first()
 
@@ -88,6 +93,7 @@ async def upload_document(
     document = await datasets.create_document(db, new_document)
     
     return document.id
+
 
 @router.get("/documents/by-pmid/{pmid}", responses={200: {"content": {"application/pdf": {}}}})
 async def get_document_by_pmid(
@@ -163,15 +169,24 @@ async def get_document_by_id(
         media_type="application/pdf"
     )
 
+
 @router.delete("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK)
 async def delete_documents_by_workspace_id(*,
     db: AsyncSession = Depends(get_async_db),
     workspace_id: UUID = Path(..., title="The UUID of the workspace whose documents will all be deleted"),
+    document_delete: DocumentDelete = Depends(),
     current_user: User = Security(auth.get_current_user)
     ):
     await authorize(current_user, DocumentPolicy.delete())
-
-    await datasets.delete_documents(db, workspace_id)
+    
+    await datasets.delete_documents(
+        db,
+        workspace_id,
+        id=document_delete.id if document_delete else None, 
+        pmid=document_delete.pmid if document_delete else None, 
+        doi=document_delete.doi if document_delete else None,
+        url=document_delete.url if document_delete else None,
+        )
 
 
 @router.get("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK, 

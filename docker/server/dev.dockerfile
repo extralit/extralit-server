@@ -23,10 +23,6 @@ RUN mkdir -p "$ARGILLA_HOME_PATH" && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
-# Set up a virtual environment in /opt/venv
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
 # Copy the scripts and install uvicorn
 COPY docker/server/scripts/start_argilla_server.sh /home/argilla/
 
@@ -36,15 +32,17 @@ COPY . /home/argilla/
 # Change the ownership of the /home/argilla directory to the new user
 WORKDIR /home/argilla/
 
+# Set up a virtual environment in /opt/venv
+SHELL ["/bin/bash", "-c"]
+RUN pip install -q uv && uv venv /opt/venv && source /opt/venv/bin/activate
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/venv"
+
+RUN uv pip install -q uvicorn[standard]
+RUN uv pip install -q -e ".[postgresql]"
+  
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
-  pip install -q uv && \
-  uv install -qqq uvicorn[standard] && \
-  uv install -qqq -e ".[postgresql]"
-  
-# Conditionally run the command based on ENV
-# RUN if [ "$ENV" = "dev" ]; then pip install --upgrade -e . ; fi
-  
-RUN chown -R argilla:argilla /home/argilla
+  chown -R argilla:argilla /home/argilla
 
 # Switch to the argilla user
 USER argilla
