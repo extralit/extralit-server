@@ -84,12 +84,14 @@ async def upload_document(
                 detail="No file was uploaded and no file_data was provided in the request body",
             )
 
-    new_document = Document(pmid=document_create.pmid, 
-                            doi=document_create.doi,
-                            url=document_create.url,
-                            file_name=document_create.file_name or file_name, 
-                            file_data=file_data_bytes,
-                            workspace_id=document_create.workspace_id)
+    new_document = Document(
+        id=document_create.id,
+        pmid=document_create.pmid, 
+        doi=document_create.doi,
+        url=document_create.url,
+        file_name=document_create.file_name or file_name, 
+        file_data=file_data_bytes,
+        workspace_id=document_create.workspace_id)
     document = await datasets.create_document(db, new_document)
     
     return document.id

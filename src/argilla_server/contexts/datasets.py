@@ -1222,6 +1222,7 @@ async def get_metadata_property_by_id(db: AsyncSession, metadata_property_id: UU
 async def create_document(db: "AsyncSession", dataset_create: DocumentCreate):
     return await Document.create(
         db,
+        id=dataset_create.id,
         url=dataset_create.url,
         file_data=dataset_create.file_data,
         file_name=dataset_create.file_name,

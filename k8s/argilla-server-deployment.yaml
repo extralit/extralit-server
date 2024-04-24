@@ -49,9 +49,11 @@ spec:
             - containerPort: 6900
           resources:
             requests:
-              cpu: "1"
+              memory: 1024Mi
+              cpu: 1000m
             limits:
-              cpu: "2"
+              memory: 6144Mi
+              cpu: 4000m
           env:
             - name: ARGILLA_ELASTICSEARCH_HOST
               value: "elasticsearch-master:9200"
