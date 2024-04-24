@@ -72,6 +72,7 @@ from argilla_server.schemas.v1.responses import (
     ResponseCreate,
     ResponseUpdate,
     ResponseUpsert,
+    ResponseValueUpdate,
     UserResponseCreate,
 )
 from argilla_server.schemas.v1.vector_settings import (
