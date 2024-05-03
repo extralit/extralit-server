@@ -131,3 +131,14 @@ k8s_resource(
 #     port_forwards=['9090', '9443'],
 #     labels=['minio']
 # )
+
+helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['vectordb'])
+helm_resource(
+    name='weaviate', 
+    chart='weaviate/weaviate', 
+    flags=[
+        '--version=16.8.8',
+        '--values=./k8s/helm/weaviate-helm.yaml'],
+    port_forwards=['8080:8080', '50051:50051'],
+    labels=['vectordb']
+)
