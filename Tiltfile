@@ -7,6 +7,7 @@ version_settings(constraint='>=0.23.4')
 allow_k8s_contexts(k8s_context())
 print("Using context:", k8s_context())
 
+
 # Read the ENV environment variable
 ENV = str(local('echo $ENV')).strip()
 USERS_DB = str(local('echo $USERS_DB')).strip()
@@ -15,10 +16,12 @@ if not DOCKER_REPO:
     DOCKER_REPO = 'localhost:5005'
     print('DOCKER_REPO not set, using default: {DOCKER_REPO}'.format(DOCKER_REPO=DOCKER_REPO))
 
+
 # Set up the same storage policy for kind as in prod
 if 'kind' in k8s_context():
     # Storage policy
     k8s_yaml('./k8s/kind/tilt-local-dev-kind-storage-policy.yaml')
+
 
 # Installing elastic/elasticsearch Helm
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
@@ -63,10 +66,10 @@ k8s_yaml([
     './k8s/argilla-server-ingress.yaml'
     ])
 k8s_resource(
-  'argilla-server-deployment',
-  resource_deps=['main-db', 'elasticsearch'],
-  port_forwards=['6901:6900' if 'kind' in k8s_context() else '6900'],
-  labels=['argilla-server'],
+    'argilla-server-deployment',
+    resource_deps=['main-db', 'elasticsearch'],
+    port_forwards=['6901:6900' if 'kind' in k8s_context() else '6900'],
+    labels=['argilla-server'],
 )
 k8s_yaml(['./k8s/argilla-loadbalancer-service.yaml'])
 
@@ -87,9 +90,17 @@ helm_resource(
 # Langfuse Observability server
 k8s_yaml('./k8s/langfuse-deployment.yaml')
 k8s_resource(
-  'langfuse-deployment',
-  port_forwards=['4000'],
-  labels=['langfuse'],
+    'langfuse-deployment',
+    port_forwards=['4000'],
+    labels=['langfuse'],
+)
+
+# Vector-Admin 
+k8s_yaml('./k8s/vector-admin-deployment.yaml')
+k8s_resource(
+    'vector-admin-deployment',
+    port_forwards=['3001:3001'],
+    labels=['vectordb'],
 )
 
 
