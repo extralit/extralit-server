@@ -45,7 +45,7 @@ docker_build(
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
     dockerfile='./docker/server/dev.dockerfile',
     # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
-    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*'],
+    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*', 'src/extralit'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
