@@ -48,4 +48,4 @@ def register_check_methods():
 register_check_methods()
 
 __all__ = ['is_valid_list_str', 'multiselect', 'suggestion', 'check_time_difference', 'check_less_than',
-           'check_greater_than', 'check_between']
+           'check_greater_than', 'check_between', 'register_check_methods']

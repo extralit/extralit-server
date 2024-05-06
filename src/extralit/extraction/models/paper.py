@@ -15,6 +15,7 @@ from extralit.schema.checks import register_check_methods
 
 register_check_methods()
 
+
 def topological_sort(schema_name: str, visited: Dict[str, int], stack: deque,
                      dependencies: Dict[str, List[str]]) -> None:
     visited[schema_name] = 1  # Gray

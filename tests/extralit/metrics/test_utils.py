@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.extralit.metrics import utils
+from extralit.metrics import utils
 from tests.utils import assert_frame_equal
 
 

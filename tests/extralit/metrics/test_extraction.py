@@ -1,4 +1,4 @@
-from src.extralit.metrics.extraction import grits_paper
+from extralit.metrics.extraction import grits_paper
 from ..extraction.test_models import *
 
 

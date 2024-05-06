@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.extralit.metrics.extraction import grits_from_pandas
+from extralit.metrics.extraction import grits_from_pandas
 
 
 def test_identical_dataframes_grits_from_pandas():
