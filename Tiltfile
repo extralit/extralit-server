@@ -129,12 +129,12 @@ k8s_resource(
 
 
 # Add the MinIO Helm repository
-# helm_repo('minio-operator', 'https://operator.min.io/', labels=['minio'])
-# # Deploy the MinIO operator
+# helm_repo('minio', 'https://operator.min.io/', labels=['minio'])
+# Deploy the MinIO operator
 # k8s_yaml('./k8s/minio-tenant.yaml')
 # helm_resource(
-#     name='extralit-minio', 
-#     chart='minio-operator/minio-operator', 
+#     name='extralit-minio-operator', 
+#     chart='minio/minio-operator', 
 #     flags=[
 #         '--version=4.3.7',
 #         '--values=./k8s/helm/minio-operator-helm.yaml'],
@@ -143,6 +143,17 @@ k8s_resource(
 #     labels=['minio']
 # )
 
+# Add the MinIO deployment
+k8s_yaml(['./k8s/minio-dev.yaml', './k8s/minio-standalone-pvc.yaml'])
+k8s_resource(
+  'minio',
+  port_forwards=['9000', '9090'],
+  deps=['./k8s/minio-dev.yaml'],
+  labels=['minio'],
+)
+
+
+# Weaviate vector database
 helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['vectordb'])
 helm_resource(
     name='weaviate', 
@@ -150,6 +161,7 @@ helm_resource(
     flags=[
         '--version=16.8.8',
         '--values=./k8s/helm/weaviate-helm.yaml'],
+    deps=['./k8s/helm/weaviate-helm.yaml'],
     port_forwards=['8080:8080', '50051:50051'],
     labels=['vectordb']
 )

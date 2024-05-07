@@ -61,6 +61,8 @@ dependencies = [
     # for CLI
     "typer >= 0.6.0, < 0.10.0", # spaCy only supports typer<0.10.0
     "packaging>=23.2",
+    # For file storage
+    "minio>=7.2.7",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +79,7 @@ extralit = [
     "html5lib",
     "html",
     "tqdm",
+    "minio",
     "argilla >= 1.27.0",
     "beautifulsoup4 ~= 4.12.2",
     "unstructured ~= 0.12.3",
