@@ -148,7 +148,6 @@ k8s_yaml(['./k8s/minio-dev.yaml', './k8s/minio-standalone-pvc.yaml'])
 k8s_resource(
   'minio',
   port_forwards=['9000', '9090'],
-  deps=['./k8s/minio-dev.yaml'],
   labels=['minio'],
 )
 

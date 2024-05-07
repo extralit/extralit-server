@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     base_url: Optional[str] = Field(description="The default base url where server will be deployed")
     database_url: Optional[str] = Field(description="The database url that argilla will use as data store")
 
+    s3_endpoint: Optional[str] = Field(description="The S3 endpoint for data storage")
+    s3_access_key: Optional[str] = Field(description="The access key for the S3 storage")
+    s3_secret_key: Optional[str] = Field(description="The secret key for the S3 storage")
+
     elasticsearch: str = "http://localhost:9200"
     elasticsearch_ssl_verify: bool = True
     elasticsearch_ca_path: Optional[str] = None
@@ -123,7 +127,14 @@ class Settings(BaseSettings):
     )
 
     span_options_max_items: int = Field(
-        default=DEFAULT_SPAN_OPTIONS_MAX_ITEMS, description="Max number of label options for questions of type `span`"
+        default=DEFAULT_SPAN_OPTIONS_MAX_ITEMS,
+        description="Max number of label options for questions of type `span`",
+    )
+
+    # Hugging Face settings
+    show_huggingface_space_persistant_storage_warning: bool = Field(
+        default=True,
+        description="If True, show a warning when Hugging Face space persistant storage is disabled",
     )
 
     # See also the telemetry.py module
@@ -180,6 +191,14 @@ class Settings(BaseSettings):
                 return re.sub(regex, "postgresql+asyncpg", database_url)
 
         return database_url
+    
+    @root_validator(pre=True)
+    def set_s3_credentials(cls, values):
+        values["s3_endpoint"] = os.getenv("S3_ENDPOINT", values.get("s3_endpoint"))
+        values["s3_access_key"] = os.getenv("S3_ACCESS_KEY", values.get("s3_access_key"))
+        values["s3_secret_key"] = os.getenv("S3_SECRET_KEY", values.get("s3_secret_key"))
+
+        return values
 
     @root_validator(skip_on_failure=True)
     def create_home_path(cls, values):
