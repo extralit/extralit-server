@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
-from pydantic import BaseModel, Field
+from argilla_server.pydantic_v1 import BaseModel, Field
 
 class DocumentCreate(BaseModel):
     id: UUID = Field(default_factory=uuid4)

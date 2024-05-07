@@ -16,9 +16,10 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Security
+from minio import Minio
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from argilla_server.contexts import accounts
+from argilla_server.contexts import accounts, files
 from argilla_server.database import get_async_db
 from argilla_server.errors import EntityAlreadyExistsError, EntityNotFoundError
 from argilla_server.policies import WorkspacePolicy, WorkspaceUserPolicy, authorize
@@ -36,6 +37,7 @@ async def create_workspace(
     db: AsyncSession = Depends(get_async_db),
     workspace_create: WorkspaceCreate,
     current_user: User = Security(auth.get_current_user),
+    minio_client = Depends(files.get_minio_client),
 ):
     await authorize(current_user, WorkspacePolicy.create)
 
@@ -43,6 +45,11 @@ async def create_workspace(
         raise EntityAlreadyExistsError(name=workspace_create.name, type=Workspace)
 
     workspace = await accounts.create_workspace(db, workspace_create)
+
+    try:
+        await files.create_bucket(minio_client, workspace.name)
+    except Exception as e:
+        print(type(e), e)
 
     return Workspace.from_orm(workspace)
 

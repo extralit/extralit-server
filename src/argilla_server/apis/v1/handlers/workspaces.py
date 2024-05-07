@@ -16,8 +16,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from minio import Minio
 
-from argilla_server.contexts import accounts, datasets
+from argilla_server.contexts import accounts, datasets, files
 from argilla_server.database import get_async_db
 from argilla_server.models import User
 from argilla_server.policies import WorkspacePolicyV1, authorize
@@ -54,6 +55,7 @@ async def delete_workspace(
     datasets_service: DatasetsService = Depends(DatasetsService.get_instance),
     workspace_id: UUID,
     current_user: User = Security(auth.get_current_user),
+    minio_client: Minio = Depends(files.get_minio_client),
 ):
     await authorize(current_user, WorkspacePolicyV1.delete)
 
@@ -75,7 +77,12 @@ async def delete_workspace(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot delete the workspace {workspace_id}. This workspace has some datasets linked",
         )
-
+    
+    try:
+        await files.delete_bucket(minio_client, workspace.name)
+    except Exception as e:
+        print(type(e), e)
+        
     return await accounts.delete_workspace(db, workspace)
 
 
