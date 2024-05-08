@@ -86,7 +86,6 @@ helm_resource(
     labels=['argilla-server']
 )
 
-
 # Langfuse Observability server
 k8s_yaml('./k8s/langfuse-deployment.yaml')
 k8s_resource(
@@ -151,6 +150,17 @@ k8s_resource(
   labels=['minio'],
 )
 
+# Cert-manager for SSL certificates
+# helm_repo('jetstack', 'https://charts.jetstack.io', labels=['security'])
+# helm_resource(
+#     name='cert-manager', 
+#     chart='jetstack/cert-manager', 
+#     flags=[
+#         '--version=1.7.1',
+#         '--set=installCRDs=true'
+#     ],
+#     labels=['security']
+# )
 
 # Weaviate vector database
 helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['vectordb'])
