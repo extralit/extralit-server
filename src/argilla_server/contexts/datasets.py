@@ -1234,7 +1234,7 @@ async def create_document(db: "AsyncSession", dataset_create: DocumentCreate):
 
 async def delete_documents(
     db: "AsyncSession", workspace_id: UUID, id: UUID = None, pmid: str = None, doi: str = None, url: str = None,
-) -> None:
+) -> List[DocumentListItem]:
     async with db.begin_nested():
         params = [Document.workspace_id == workspace_id]
         if id is not None and id != '':
@@ -1245,9 +1245,10 @@ async def delete_documents(
             params.append(Document.doi == doi)
         documents = await Document.delete_many(db=db, params=params, autocommit=False)
 
-        print(f"Deleting {len(documents)} documents")
-
     await db.commit()
+    documents = [DocumentListItem(**doc.__dict__) for doc in documents]
+    return documents
+
 
 async def list_documents(
     db: "AsyncSession", workspace_id: UUID

@@ -1,45 +1,106 @@
 from typing import Optional
-from argilla_server.policies import FilePolicy, _exists_workspace_user_by_user_and_workspace_name, authorize
-from fastapi import APIRouter, Depends, HTTPException, status, Security
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Security
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from minio import Minio, S3Error
 
+from argilla_server.policies import FilePolicy, _exists_workspace_user_by_user_and_workspace_name, authorize
 from argilla_server.security import auth
 from argilla_server.models import User
 from argilla_server.contexts import files
+from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata
 
 router = APIRouter(tags=["files"])
 
-@router.get("/files/{bucket}/{object}")
+@router.get("/file/{bucket}/{object:path}")
 async def get_file(
     *,
     bucket: str, 
     object: str, 
     version_id: Optional[str] = None,
-    minio_client: Minio = Depends(files.get_minio_client),
-    current_user: User = Security(auth.get_current_user)):
+    client: Minio = Depends(files.get_minio_client),
+    # current_user: User = Security(auth.get_current_user)
+    ):
 
     # Check if the current user is in the workspace to have access to the s3 bucket of the same name
-    await authorize(current_user, FilePolicy.get(bucket))
-
-    stat = minio_client.stat_object(bucket, object, version_id=version_id)
+    # await authorize(current_user, FilePolicy.get(bucket))
 
     try:
-        response = minio_client.get_object(bucket, object, version_id=stat.version_id)
+        s3object = files.get_object(client, bucket, object, version_id=version_id)
         headers = {
-            "Content-Disposition": f"attachment; filename={object}",
-            "Content-Type": stat.content_type,
-            "X-Version-Id": stat.version_id,
-            "X-Last-Modified": stat.last_modified.strftime('%Y-%m-%dT%H:%M:%S'),
-            "X-Is-Latest": stat.is_latest != 'false',
+            "Content-Type": s3object.metadata.content_type,
+            "X-Version-Id": s3object.metadata.version_id,
+            "X-Last-Modified": s3object.metadata.last_modified.strftime('%Y-%m-%dT%H:%M:%S'),
+            "X-Is-Latest": str(s3object.metadata.is_latest).lower(),
         }
-        return StreamingResponse(response, media_type=stat.content_type, headers=headers)
+        return StreamingResponse(
+            s3object.response, media_type=s3object.metadata.content_type, headers=headers
+        )
     
-    except S3Error as e:
-        print(e)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise e
+
     
+@router.post("/file/{bucket}/{object:path}", response_model=ObjectMetadata)
+async def put_file(
+    *,
+    bucket: str, 
+    object: str, 
+    file: UploadFile = File(...),
+    client: Minio = Depends(files.get_minio_client),
+    current_user: User = Security(auth.get_current_user)
+    ):
+
+    # Check if the current user is in the workspace to have access to the s3 bucket of the same name
+    await authorize(current_user, FilePolicy.put_object(bucket))
+    
+    try:
+        response = files.put_object(client, bucket, object, 
+                                    data=file.file, size=file.size, content_type=file.content_type)
+        return response
+    except S3Error as se:
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+
+@router.get("/files/{bucket}/{prefix:path}", response_model=ListObjectsResponse)
+async def list_objects(
+    *,
+    bucket: str, 
+    prefix: str = "",
+    include_version=True,
+    client: Minio = Depends(files.get_minio_client),
+    current_user: User = Security(auth.get_current_user),
+    ):
+    # Check if the current user is in the workspace to have access to the s3 bucket of the same name
+    await authorize(current_user, FilePolicy.list(bucket))
+
+    try:
+        objects = files.list_objects(client, bucket, prefix=prefix, include_version=include_version)
+        return objects
+    except S3Error as se:
+        raise HTTPException(status_code=404, detail=f"No objects at prefix '{bucket}/{prefix}' were found")
+    except Exception as e:
+        raise e
+
+
+
+@router.delete("/files/{bucket}/{object:path}")
+async def delete_files(
+    *,
+    bucket: str, 
+    object: str, 
+    version_id: Optional[str] = None,
+    client: Minio = Depends(files.get_minio_client),
+    current_user: User = Security(auth.get_current_user)
+    ):
+    
+    # Check if the current user is in the workspace to have access to the s3 bucket of the same name
+    await authorize(current_user, FilePolicy.delete(bucket))
+
+    try:
+        files.delete_object(client, bucket, object, version_id=version_id)
+        return {"message": "File deleted"}
+    except S3Error as se:
+        raise HTTPException(status_code=500, detail="Internal server error")
+    except Exception as e:
+        raise e
+

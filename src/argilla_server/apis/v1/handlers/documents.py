@@ -1,10 +1,13 @@
 import base64
 from io import BytesIO
+import logging
 from uuid import UUID
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 
+from argilla_server.schemas.v1.files import ObjectMetadata
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, Path, status, Security
 from fastapi.responses import StreamingResponse
+from minio import Minio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, func, or_, select
 
@@ -13,11 +16,13 @@ from argilla_server.models.database import Document
 from argilla_server.security import auth
 from argilla_server.policies import DocumentPolicy, authorize, is_authorized
 from argilla_server.models import User
-from argilla_server.contexts import accounts, datasets
+from argilla_server.contexts import accounts, datasets, files
 from argilla_server.schemas.v1.documents import DocumentCreate, DocumentDelete, DocumentListItem
 
 if TYPE_CHECKING:
     from argilla_server.models import Document
+
+_LOGGER = logging.getLogger("documents")
 
 router = APIRouter(tags=["documents"])
 
@@ -35,7 +40,7 @@ async def check_existing_document(db: AsyncSession, document_create: DocumentCre
 
     if not conditions:
         return None
-
+    
     # Check if a document with the same pmid, url, or doi already exists
     existing_document = await db.execute(
         select(Document).where(
@@ -53,49 +58,51 @@ async def check_existing_document(db: AsyncSession, document_create: DocumentCre
 @router.post("/documents", status_code=status.HTTP_201_CREATED, response_model=UUID)
 async def upload_document(
     *,
-    db: AsyncSession = Depends(get_async_db),
     document_create: DocumentCreate,
+    db: AsyncSession = Depends(get_async_db),
+    client: Minio = Depends(files.get_minio_client),
     current_user: User = Security(auth.get_current_user)
 ):
-    await authorize(current_user, DocumentPolicy.get())
+    await authorize(current_user, DocumentPolicy.create())
 
-    if not await accounts.get_workspace_by_id(db, document_create.workspace_id):
+    if document_create.file_data is not None:
+        file_data_bytes = base64.b64decode(document_create.file_data)
+    else:
+        file_data_bytes = None
+
+    workspace = await accounts.get_workspace_by_id(db, document_create.workspace_id)
+    if not workspace:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Workspace with id `{document_create.workspace_id}` not found",
         )
     
+    existing_files = files.list_objects(client, workspace.name, prefix=str(document_create.id), include_version=False)
+    if True or not existing_files.objects and file_data_bytes is not None:
+        object_path = files.get_s3_object_path(document_create.id)
+        response = files.put_object(
+            client, bucket=workspace.name, object=object_path, data=file_data_bytes, 
+            size=len(file_data_bytes), content_type="application/pdf", 
+            metadata=document_create.dict(include={"file_name": True, "pmid": True, "doi": True}))
+        
+        if not document_create.url:
+            document_create.url = f'api/v1/file/{response.bucket_name}/{response.object_name}'
+    
     existing_document = await check_existing_document(db, document_create)
     if existing_document is not None:
-        print("Document already exists", existing_document.id)
         return existing_document.id
     
-    # If a file is uploaded, use it. Otherwise, use the file_data from the DocumentCreate model
-    document = None
-    if document is not None:
-        file_name = document.filename
-        file_data_bytes = await document.read()
-    else:
-        if document_create.file_data is not None:
-            file_data_bytes = base64.b64decode(document_create.file_data)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No file was uploaded and no file_data was provided in the request body",
-            )
-
     new_document = Document(
         id=document_create.id,
         pmid=document_create.pmid, 
         doi=document_create.doi,
         url=document_create.url,
-        file_name=document_create.file_name or file_name, 
-        file_data=file_data_bytes,
+        file_name=document_create.file_name, 
         workspace_id=document_create.workspace_id)
+    
     document = await datasets.create_document(db, new_document)
     
     return document.id
-
 
 @router.get("/documents/by-pmid/{pmid}", responses={200: {"content": {"application/pdf": {}}}})
 async def get_document_by_pmid(
@@ -137,8 +144,8 @@ async def get_document_by_pmid(
 @router.get("/documents/by-id/{id}", responses={200: {"content": {"application/pdf": {}}}})
 async def get_document_by_id(
     *,
-    db: AsyncSession = Depends(get_async_db),
     id: UUID = Path(..., title="The UUID of the document to get"),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Security(auth.get_current_user)
 ):
     if id is None:
@@ -174,14 +181,17 @@ async def get_document_by_id(
 
 @router.delete("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK)
 async def delete_documents_by_workspace_id(*,
+    workspace_id: Union[UUID, str],
+    document_delete: DocumentDelete,
     db: AsyncSession = Depends(get_async_db),
-    workspace_id: UUID = Path(..., title="The UUID of the workspace whose documents will all be deleted"),
-    document_delete: DocumentDelete = Depends(),
+    client: Minio = Depends(files.get_minio_client),
     current_user: User = Security(auth.get_current_user)
     ):
-    await authorize(current_user, DocumentPolicy.delete())
+    await authorize(current_user, DocumentPolicy.delete(workspace_id))
+
+    workspace = await accounts.get_workspace_by_id(db, workspace_id)
     
-    await datasets.delete_documents(
+    documents = await datasets.delete_documents(
         db,
         workspace_id,
         id=document_delete.id if document_delete else None, 
@@ -189,6 +199,11 @@ async def delete_documents_by_workspace_id(*,
         doi=document_delete.doi if document_delete else None,
         url=document_delete.url if document_delete else None,
         )
+    
+    _LOGGER.info(f"Deleting {len(documents)} documents")
+    for document in documents:
+        object_path = files.get_s3_object_path(document.id)
+        files.delete_object(client, workspace.name, object_path)
 
 
 @router.get("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK, 
@@ -198,7 +213,7 @@ async def list_documents(*,
     workspace_id: UUID = Path(..., title="The UUID of the workspace whose documents will be retrieved"),
     current_user: User = Security(auth.get_current_user)
     ) -> List[Document]:
-    await authorize(current_user, DocumentPolicy.list())
+    await authorize(current_user, DocumentPolicy.list(workspace_id))
 
     documents = await datasets.list_documents(db, workspace_id)
 

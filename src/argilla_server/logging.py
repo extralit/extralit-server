@@ -62,7 +62,7 @@ class LoggingMixin:
 
 def configure_logging():
     """Normalizes logging configuration for argilla and its dependencies"""
-    handler = ArgillaHandler()
+    handler = ArgillaHandler(locals_max_string=150)
 
     # See the note here: https://docs.python.org/3/library/logging.html#logging.Logger.propagate
     # We only attach our handler to the root logger and let propagation take care of the rest

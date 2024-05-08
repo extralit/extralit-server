@@ -454,7 +454,6 @@ class Document(DatabaseModel):
     __tablename__ = "documents"
 
     url: Mapped[str] = mapped_column(String, nullable=True)
-    file_data: Mapped[LargeBinary] = mapped_column(LargeBinary, nullable=False)
     file_name: Mapped[str] = mapped_column(String, nullable=False)
     pmid: Mapped[str] = mapped_column(String, index=True, nullable=True)
     doi: Mapped[str] = mapped_column(String, index=True, nullable=True)

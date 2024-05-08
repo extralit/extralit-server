@@ -1,9 +1,14 @@
+import io
 import logging
-from typing import Optional
+import os
+from typing import Any, BinaryIO, Dict, List, Optional, Union
 from urllib.parse import urlparse
+from uuid import UUID
+from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata, FileObject
 from argilla_server.settings import settings
 from fastapi import HTTPException
 from minio import Minio, S3Error
+from minio.helpers import ObjectWriteResult
 from minio.versioningconfig import VersioningConfig
 from minio.datatypes import Object
 
@@ -30,56 +35,91 @@ def get_minio_client() -> Optional[Minio]:
             secure=parsed_url.scheme == "https",
         )
     except Exception as e:
-        _LOGGER.error(f"Error creating Minio client: {e}")
+        _LOGGER.error(f"Error creating Minio client: {e}", stack_info=True)
         return None
 
 
-async def stat_object(minio_client: Minio, bucket: str, object: str, version_id: Optional[str] = None):
+def list_objects(client: Minio, bucket: str, prefix: Optional[str] = None, include_version=True) -> ListObjectsResponse:
     try:
-        return minio_client.stat_object(bucket, object, version_id=version_id)
-    except S3Error as se:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}")
-        raise HTTPException(status_code=404, detail=f"Object {object} not found in bucket {bucket}")
-    except Exception as e:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-
-async def get_object(minio_client: Minio, bucket: str, object: str, version_id: Optional[str] = None):
-    try:
-        stat = minio_client.stat_object(bucket, object, version_id=version_id)
-
-        # Get the object
-        obj = minio_client.get_object(bucket, object, version_id=stat.version_id)
-
-        # Get the current version
-        current_version = await minio_client.get_object_version(bucket, object)
-
-        # Get the list of previous versions
-        previous_versions = await minio_client.list_object_versions(bucket, prefix=object)
-
-        # Filter out the current version from the list of previous versions
-        previous_versions = [version for version in previous_versions if version.version_id != current_version.version_id]
-
-        # return ObjectData(current_version=current_version, previous_versions=previous_versions)
+        objects = client.list_objects(bucket, prefix=prefix, include_version=include_version)
+        objects = [ObjectMetadata.from_minio_object(obj) for obj in objects]
+        return ListObjectsResponse(objects=objects)
     
     except S3Error as se:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}")
-        raise HTTPException(status_code=404, detail=f"Object {object} not found in bucket {bucket}")
+        _LOGGER.error(f"Error listing objects in '{bucket}/{prefix}': {se}", stack_info=True)
+        raise HTTPException(status_code=404, detail=f"Cannot list objects with '{bucket}/{prefix}' not found")
     except Exception as e:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {e}")
+        _LOGGER.error(f"Error listing objects in bucket '{bucket}/{prefix}': {e}", stack_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     
 
-
-# async def put_object(minio_client: Minio, bucket: str, object: str, data: bytes):
-
-
-async def create_bucket(minio_client: Minio, workspace_name: str):
+def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str] = None, 
+                     include_versions=False) -> FileObject:
     try:
-        await minio_client.make_bucket(workspace_name)
-        await minio_client.set_bucket_versioning(workspace_name, VersioningConfig(VersioningConfig.ENABLED))
+        stat = client.stat_object(bucket, object, version_id=version_id)
+        response = client.get_object(bucket, object, version_id=stat.version_id)
+
+        if include_versions:
+            versions = list_objects(client, bucket, prefix=object)
+            return FileObject(response=response, metadata=stat, versions=versions)
+
+        return FileObject(response=response, metadata=stat)
+    
+    except S3Error as se:
+        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}", stack_info=True)
+        raise HTTPException(status_code=404, detail=f"Object {object} not found in bucket {bucket}")
+    except Exception as e:
+        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {e}", stack_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+
+def put_object(client: Minio, bucket: str, object: str, data: Union[BinaryIO, bytes, str], 
+               content_type: str=None,
+               size: int=None, 
+               metadata: Dict[str, Any]=None, 
+               part_size:int = 100 * 1024 * 1024) -> ObjectMetadata:
+    
+    if isinstance(data, bytes):
+        data_bytes_io = io.BytesIO(data)
+        size = len(data)
+    elif isinstance(data, str):
+        encoded_data = data.encode('utf-8')
+        data_bytes_io = io.BytesIO(encoded_data)
+        size = len(encoded_data)
+    else:
+        data_bytes_io = data
+
+    try:
+        response = client.put_object(
+            bucket, object, data_bytes_io, content_type=content_type,
+            length=size, part_size=part_size, metadata=metadata)
+        
+        return ObjectMetadata.from_minio_write_response(response)
+
+    except S3Error as se:
+        _LOGGER.error(f"Error putting object {object} in bucket {bucket}: {se}")
+        raise se
+    except Exception as e:
+        _LOGGER.error(f"Error putting object {object} in bucket {bucket}: {e}")
+        raise e
+
+
+def delete_object(client: Minio, bucket: str, object: str, version_id: Optional[str] = None):
+    try:
+        client.remove_object(bucket, object, version_id=version_id)
+        
+    except S3Error as se:
+        _LOGGER.error(f"Error deleting object {object} from bucket {bucket}: {se}")
+        raise se
+    except Exception as e:
+        _LOGGER.error(f"Error deleting object {object} from bucket {bucket}: {e}")
+        raise e
+
+
+def create_bucket(client: Minio, workspace_name: str):
+    try:
+        client.make_bucket(workspace_name)
+        client.set_bucket_versioning(workspace_name, VersioningConfig(VersioningConfig.ENABLED))
     except S3Error as se:
         if se.code == "BucketAlreadyOwnedByYou":
             pass
@@ -91,9 +131,9 @@ async def create_bucket(minio_client: Minio, workspace_name: str):
         raise e
 
 
-async def delete_bucket(minio_client: Minio, workspace_name: str):
+def delete_bucket(client: Minio, workspace_name: str):
     try:
-        await minio_client.remove_bucket(workspace_name)
+        client.remove_bucket(workspace_name)
     except S3Error as se:
         if se.code == "NoSuchBucket":
             pass
@@ -103,3 +143,14 @@ async def delete_bucket(minio_client: Minio, workspace_name: str):
     except Exception as e:
         _LOGGER.error(f"Error deleting bucket {workspace_name}: {e}")
         raise e
+
+
+def get_s3_object_path(id: Union[UUID, str]):
+    if id is None:
+        raise Exception("id cannot be None")
+    elif isinstance(id, UUID):
+        object_path = f'pdf/{str(id)}'
+    else:
+        object_path = f'pdf/{id}'
+
+    return object_path
