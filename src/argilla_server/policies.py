@@ -152,14 +152,14 @@ class DocumentPolicy:
     @classmethod
     def delete(cls, workspace_id: UUID) -> PolicyAction:
         async def is_allowed(actor: User) -> bool:
-            return actor.is_owner or actor.is_admin and _exists_workspace_user_by_user_and_workspace_id(actor, workspace_id)
+            return actor.is_owner or actor.is_admin and await _exists_workspace_user_by_user_and_workspace_id(actor, workspace_id)
 
         return is_allowed
     
     @classmethod
     def list(cls, workspace_id: UUID) -> PolicyAction:
         async def is_allowed(actor: User) -> bool:
-            return actor.is_owner or actor.is_admin and _exists_workspace_user_by_user_and_workspace_id(actor, workspace_id)
+            return actor.is_owner or actor.is_admin and await _exists_workspace_user_by_user_and_workspace_id(actor, workspace_id)
 
         return is_allowed
         

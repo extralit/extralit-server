@@ -26,3 +26,6 @@ class DocumentListItem(BaseModel):
     pmid: Optional[str]
     doi: Optional[str]
     workspace_id: UUID
+
+    class Config:
+        orm_mode = True

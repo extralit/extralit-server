@@ -1220,17 +1220,19 @@ async def get_metadata_property_by_id(db: AsyncSession, metadata_property_id: UU
     )
     return result.scalar_one_or_none()
 
-async def create_document(db: "AsyncSession", dataset_create: DocumentCreate):
-    return await Document.create(
+
+async def create_document(db: "AsyncSession", dataset_create: DocumentCreate) -> DocumentListItem:
+    document = await Document.create(
         db,
         id=dataset_create.id,
         url=dataset_create.url,
-        file_data=dataset_create.file_data,
         file_name=dataset_create.file_name,
         pmid=dataset_create.pmid,
         doi=dataset_create.doi,
-        workspace_id=dataset_create.workspace_id,
-)
+        workspace_id=dataset_create.workspace_id)
+
+    return DocumentListItem.from_orm(document)
+
 
 async def delete_documents(
     db: "AsyncSession", workspace_id: UUID, id: UUID = None, pmid: str = None, doi: str = None, url: str = None,
@@ -1256,6 +1258,6 @@ async def list_documents(
 
     result = await db.execute(select(Document).filter_by(workspace_id=workspace_id))
     documents: List[Document] = result.scalars().all()
-    documents = [DocumentListItem(**doc.__dict__) for doc in documents]
+    documents = [DocumentListItem.from_orm(doc) for doc in documents]
 
     return documents

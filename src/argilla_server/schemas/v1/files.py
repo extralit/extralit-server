@@ -15,6 +15,7 @@ class ObjectMetadata(BaseModel):
     size: Optional[int]
     content_type: Optional[str]
     version_id: Optional[str]
+    metadata: Optional[Dict[str, Any]]
 
     @classmethod
     def from_minio_object(cls, minio_object: Object):

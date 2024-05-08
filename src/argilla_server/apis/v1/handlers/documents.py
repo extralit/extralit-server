@@ -78,7 +78,7 @@ async def upload_document(
         )
     
     existing_files = files.list_objects(client, workspace.name, prefix=str(document_create.id), include_version=False)
-    if True or not existing_files.objects and file_data_bytes is not None:
+    if not existing_files.objects and file_data_bytes is not None:
         object_path = files.get_s3_object_path(document_create.id)
         response = files.put_object(
             client, bucket=workspace.name, object=object_path, data=file_data_bytes, 
@@ -141,7 +141,7 @@ async def get_document_by_pmid(
         media_type="application/pdf"
     )
 
-@router.get("/documents/by-id/{id}", responses={200: {"content": {"application/pdf": {}}}})
+@router.get("/documents/by-id/{id}", response_model=DocumentListItem)
 async def get_document_by_id(
     *,
     id: UUID = Path(..., title="The UUID of the document to get"),
@@ -168,21 +168,13 @@ async def get_document_by_id(
     
     document: Document = documents[0]
 
-    return StreamingResponse(
-        BytesIO(document.file_data), 
-        headers={
-            "Content-Disposition": f'attachment; filename="{document.file_name}"',
-            "X-Document-ID": str(document.id),
-            "X-Document-File-Name": document.file_name,
-        },
-        media_type="application/pdf"
-    )
+    return DocumentListItem.from_orm(document)
 
 
 @router.delete("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK)
 async def delete_documents_by_workspace_id(*,
     workspace_id: Union[UUID, str],
-    document_delete: DocumentDelete,
+    document_delete: DocumentDelete = Body(None),
     db: AsyncSession = Depends(get_async_db),
     client: Minio = Depends(files.get_minio_client),
     current_user: User = Security(auth.get_current_user)
@@ -204,6 +196,8 @@ async def delete_documents_by_workspace_id(*,
     for document in documents:
         object_path = files.get_s3_object_path(document.id)
         files.delete_object(client, workspace.name, object_path)
+
+    return len(documents)
 
 
 @router.get("/documents/workspace/{workspace_id}", status_code=status.HTTP_200_OK, 
