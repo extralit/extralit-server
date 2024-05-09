@@ -77,13 +77,13 @@ postgresql = [
 extraction = [
     "minio",
     "argilla",
-    "pyyaml",
-    "frictionless",
     "hypothesis",
     "html5lib",
+    "pypandoc ~= 1.13",
+    "weaviate-client ~= 3.26.2",
     "beautifulsoup4 ~= 4.12.2",
     "pandas ~= 2.2.2",
-    "pandera ~= 0.18.3",
+    "pandera[io] ~= 0.18.3",
     "pydantic ~= 2.7.1",
     "numpy ~= 1.26.4",
     "spacy ~= 3.7.2",
@@ -95,12 +95,12 @@ extraction = [
     "fastparquet"
 ]
 nlp = [
-    "timm == 0.5.4",
     "textdescriptives",
     "setfit ~= 0.7.0",
 ]
 pdf = [
-    "pypandoc ~= 1.12",
+    "nougat-ocr[api]",
+    "timm == 0.5.4",
     "unstructured ~= 0.12.3",
     "pypdf",
     "pypdfium2",

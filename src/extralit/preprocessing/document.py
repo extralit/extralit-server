@@ -155,8 +155,9 @@ def create_or_load_nougat_segments(paper: pd.Series, preprocessing_path='data/pr
         return load_segments(cache_path)
 
     if not exists(model_output_path) or redo:
+        from extralit.preprocessing.text import NougatOCR
         print(f"Nougat {paper.name}: {cache_path}", flush=True)
-        nougat_model: nougat.NougatOCR
+        assert isinstance(nougat_model, NougatOCR), f"Invalid Nougat model: {nougat_model}"
 
         predictions = nougat_model.predict(paper.file_path)
         output = nougat.NougatOutput(reference=paper.name, pages=predictions)
