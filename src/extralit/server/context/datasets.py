@@ -11,6 +11,7 @@ def get_argilla_dataset(name="Table-Preprocessing", workspace="itn-recalibration
         rg.init(
             api_url=os.getenv('ARGILLA_BASE_URL'),
             api_key=os.getenv('ARGILLA_API_KEY'),
+            workspace='argilla',
         )
     except Exception as e:
         print(e)
