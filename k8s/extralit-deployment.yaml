@@ -17,13 +17,35 @@ spec:
         image: extralit-server
         ports:
         - containerPort: 5555
-        volumeMounts:
-          - name: extralit-storage
-            mountPath: /app
-      volumes:
-      - name: extralit-storage
-        persistentVolumeClaim:
-          claimName: extralit-pvc 
+        env:
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: extralit-secrets
+                key: OPENAI_API_KEY
+          - name: ARGILLA_BASE_URL
+            value: "http://argilla-server:6900"
+          - name: ARGILLA_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: extralit-secrets
+                key: ARGILLA_API_KEY
+          - name: WCS_HTTP_URL
+            value: "http://weaviate"
+          - name: WCS_GRPC_URL
+            value: "weaviate-grpc"
+          - name: WCS_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: weaviate-api-keys
+                key: AUTHENTICATION_APIKEY_ALLOWED_KEYS
+        # volumeMounts:
+        #   - name: extralit-storage
+        #     mountPath: /tmp/
+      # volumes:
+      # - name: extralit-storage
+      #   persistentVolumeClaim:
+      #     claimName: extralit-pvc 
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

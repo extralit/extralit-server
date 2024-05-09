@@ -18,6 +18,7 @@
 **/.pdm-build
 **/.venv
 **/.github
+**/lost+found
 
 **/node_modules
 **/_nuxt

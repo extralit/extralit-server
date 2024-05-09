@@ -44,12 +44,12 @@ docker_build(
     context='.',
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
     dockerfile='./docker/server/argilla_server.dockerfile',
-    # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
     ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*', 'src/extralit', 'docker/server/extralit.dockerfile'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
         sync('./docker/server/scripts/start_argilla_server.sh', '/home/argilla/'),
+        sync('./pyproject.toml', '/home/argilla/pyproject.toml'),
         # Restart the server to pick up code changes
         run('/bin/bash start_argilla_server.sh', trigger='./docker/server/scripts/start_argilla_server.sh'),
     ]
@@ -85,6 +85,7 @@ helm_resource(
     port_forwards=['5433:5432' if 'kind' in k8s_context() else '5432'],
     labels=['argilla-server']
 )
+
 
 # Langfuse Observability server
 k8s_yaml('./k8s/langfuse-deployment.yaml')
@@ -170,22 +171,27 @@ docker_build(
     "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO),
     context='.',
     dockerfile='./docker/server/extralit.dockerfile',
-    ignore=['k8s/', '.venv/', '.*', 
+    ignore=['k8s/', '.venv/', '.*', 'docker/',
             'src/argilla_server/', '!src/argilla_server/_version.py'],
+    live_update=[
+        sync('./argilla/', '/home/extralit/argilla/'),
+        sync('./src/', '/home/extralit/src/'),
+        sync('./pyproject.toml', '/home/extralit/pyproject.toml'),
+        run('/bin/bash -c "uv pip install --upgrade -e .[extraction,llm]"', trigger='./pyproject.toml'),
+    ]
 )
-
 extralit_k8s_yaml = read_yaml_stream('./k8s/extralit-deployment.yaml')
 for o in extralit_k8s_yaml:
     for container in o['spec']['template']['spec']['containers']:
         if container['name'] == 'extralit-server':
             container['image'] = "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO)
-
 k8s_yaml([
     encode_yaml_stream(extralit_k8s_yaml), 
-    './k8s/extralit-storage-service.yaml'
+    # './k8s/extralit-storage-service.yaml'
     ])
 k8s_resource(
     'extralit-deployment',
+    resource_deps=['minio', 'weaviate'],
     port_forwards=['5555'],
     labels=['extralit'],
 )
