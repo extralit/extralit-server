@@ -1,18 +1,15 @@
 [project]
 name = "argilla-server"
 dynamic = ["version"]
-description = "Open-source tool for accurate & fast scientific literature data extraction with LLMs and human-in-the-loop."
+description = "Open-source tool for accurate & fast scientific literature data extraction with LLM and human-in-the-loop."
 readme = "README.md"
 requires-python = ">=3.9,<3.11"
 license = { text = "Apache-2.0" }
 keywords = [
-    "data-science",
-    "natural-language-processing",
-    "text-labeling",
+    "literature-review",
     "data-annotation",
     "artificial-intelligence",
-    "knowledged-graph",
-    "developers-tools",
+    "machine-learning",
     "human-in-the-loop",
     "mlops",
 ]
@@ -25,6 +22,14 @@ maintainers = [
     { name = "argilla", email = "contact@argilla.io" }
 ]
 dependencies = [
+    "fastapi >= 0.103.1,< 1.0.0",
+    "pydantic",
+    "rich != 13.1.0",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+argilla_server = [
     # Basic dependencies
     "fastapi >= 0.103.1,< 1.0.0",
     "pydantic >= 1.10.7,< 2.0",
@@ -64,32 +69,23 @@ dependencies = [
     # For file storage
     "minio>=7.2.7",
 ]
-
-[project.optional-dependencies]
 postgresql = [
     "psycopg2 ~= 2.9.5",
     # Async PostgreSQL
     "asyncpg >=0.27.0",
 ]
-extralit = [
+extraction = [
+    "minio",
+    "argilla",
     "pyyaml",
     "frictionless",
     "hypothesis",
-    "textdescriptives",
     "html5lib",
-    "html",
-    "tqdm",
-    "minio",
-    "argilla >= 1.27.0",
     "beautifulsoup4 ~= 4.12.2",
-    "unstructured ~= 0.12.3",
     "pandas ~= 2.2.2",
     "pandera ~= 0.18.3",
     "pydantic ~= 2.7.1",
-    "timm == 0.5.4",
-    "pypandoc ~= 1.12",
     "numpy ~= 1.26.4",
-    "setfit ~= 0.7.0",
     "spacy ~= 3.7.2",
     "pyarrow == 14.*",
     "natsort ~= 8.4.0",
@@ -98,7 +94,14 @@ extralit = [
     "json_repair ~= 0.8.0",
     "fastparquet"
 ]
+nlp = [
+    "timm == 0.5.4",
+    "textdescriptives",
+    "setfit ~= 0.7.0",
+]
 pdf = [
+    "pypandoc ~= 1.12",
+    "unstructured ~= 0.12.3",
     "pypdf",
     "pypdfium2",
     "pdf2image ~= 1.16.0",
@@ -108,10 +111,13 @@ pdf = [
     "python-doctr ~= 0.8.1",
 ]
 llm = [
-    "llama-index-core",
+    "llama-index >= 0.10.29",
+    "llama-index-core >= 0.10.29",
     "llama-index-llms-openai",
+    "llama-index-embeddings-openai",
     "llama-index-multi-modal-llms-openai",
-    "llama-index-callbacks-aim >= 0.1.2"
+    "llama-index-callbacks-langfuse",
+    "llama-index-vector-stores-weaviate",
 ]
 
 [project.urls]

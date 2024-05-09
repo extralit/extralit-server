@@ -28,7 +28,7 @@ spec:
               - key: role
                 operator: In
                 values:
-                - backend
+                - argilla-server
       initContainers:
         - name: wait-for-elasticsearch
           image: alpine/curl:latest

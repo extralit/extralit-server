@@ -1,0 +1,23 @@
+# Distribution packages
+!dist/*.whl
+
+# Scripts
+!docker/scripts/start_argilla_server.sh
+!docker/scripts/wait-for-it.sh
+!docker/scripts/start_quickstart_argilla.sh
+!docker/scripts/load_data.py
+
+# Package dependencies
+!docker/quickstart.requirements.txt
+
+# Egg-info directories
+**/.egg-info
+**/.DS_Store
+**/__pycache__
+**/.ipynb_checkpoints
+**/.pdm-build
+**/.venv
+**/.github
+
+**/node_modules
+**/_nuxt

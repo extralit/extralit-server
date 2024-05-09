@@ -119,7 +119,9 @@ def delete_object(client: Minio, bucket: str, object: str, version_id: Optional[
 def create_bucket(client: Minio, workspace_name: str):
     try:
         client.make_bucket(workspace_name)
-        client.set_bucket_versioning(workspace_name, VersioningConfig(VersioningConfig.ENABLED))
+        client.set_bucket_versioning(workspace_name, VersioningConfig(VersioningConfig.ENABLED, 
+                                                                      excluded_prefixes=['pdf/'], 
+                                                                      exclude_folders=True))
     except S3Error as se:
         if se.code == "BucketAlreadyOwnedByYou":
             pass
@@ -145,7 +147,7 @@ def delete_bucket(client: Minio, workspace_name: str):
         raise e
 
 
-def get_s3_object_path(id: Union[UUID, str]):
+def get_pdf_s3_object_path(id: Union[UUID, str]):
     if id is None:
         raise Exception("id cannot be None")
     elif isinstance(id, UUID):
@@ -154,3 +156,6 @@ def get_s3_object_path(id: Union[UUID, str]):
         object_path = f'pdf/{id}'
 
     return object_path
+
+def get_s3_object_url(bucket_name:str, object_name:str)->str:
+    return f'/api/v1/file/{bucket_name}/{object_name}'

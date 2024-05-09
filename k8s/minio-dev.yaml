@@ -12,6 +12,21 @@ metadata:
     app: minio
   name: minio
 spec:
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - storage
   containers:
   - name: minio
     image: quay.io/minio/minio:latest

@@ -18,7 +18,7 @@ async def get_file(
     object: str, 
     version_id: Optional[str] = None,
     client: Minio = Depends(files.get_minio_client),
-    # current_user: User = Security(auth.get_current_user)
+    current_user: Optional[User] = Security(auth.get_optional_current_user)
     ):
 
     # Check if the current user is in the workspace to have access to the s3 bucket of the same name
@@ -35,9 +35,11 @@ async def get_file(
         return StreamingResponse(
             s3object.response, media_type=s3object.metadata.content_type, headers=headers
         )
+    except S3Error as se:
+        raise HTTPException(status_code=404, detail=f"No object at path '{bucket}/{object}' was found")
     
     except Exception as e:
-        raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
     
 @router.post("/file/{bucket}/{object:path}", response_model=ObjectMetadata)
@@ -65,7 +67,7 @@ async def put_file(
 async def list_objects(
     *,
     bucket: str, 
-    prefix: str = "",
+    prefix: str,
     include_version=True,
     client: Minio = Depends(files.get_minio_client),
     current_user: User = Security(auth.get_current_user),

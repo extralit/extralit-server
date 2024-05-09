@@ -20,7 +20,7 @@ postgresql:
         - key: role
           operator: In
           values:
-          - backend
+          - storage
   volumePermissions:
     enabled: true
 

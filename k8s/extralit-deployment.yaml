@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extralit-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: extralit
+  template:
+    metadata:
+      labels:
+        app: extralit
+    spec:
+      containers:
+      - name: extralit-server
+        image: extralit-server
+        ports:
+        - containerPort: 5555
+        volumeMounts:
+          - name: extralit-storage
+            mountPath: /app
+      volumes:
+      - name: extralit-storage
+        persistentVolumeClaim:
+          claimName: extralit-pvc 
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - extralit

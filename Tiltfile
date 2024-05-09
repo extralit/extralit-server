@@ -43,9 +43,9 @@ docker_build(
     "{DOCKER_REPO}/extralit-argilla-server".format(DOCKER_REPO=DOCKER_REPO),
     context='.',
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
-    dockerfile='./docker/server/dev.dockerfile',
+    dockerfile='./docker/server/argilla_server.dockerfile',
     # only=['./src', './dist', './docker/server/scripts', './pyproject.toml', './pdm.lock'],
-    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*', 'src/extralit'],
+    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*', 'src/extralit', 'docker/server/extralit.dockerfile'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
@@ -150,17 +150,6 @@ k8s_resource(
   labels=['minio'],
 )
 
-# Cert-manager for SSL certificates
-# helm_repo('jetstack', 'https://charts.jetstack.io', labels=['security'])
-# helm_resource(
-#     name='cert-manager', 
-#     chart='jetstack/cert-manager', 
-#     flags=[
-#         '--version=1.7.1',
-#         '--set=installCRDs=true'
-#     ],
-#     labels=['security']
-# )
 
 # Weaviate vector database
 helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['vectordb'])
@@ -174,3 +163,42 @@ helm_resource(
     port_forwards=['8080:8080', '50051:50051'],
     labels=['vectordb']
 )
+
+
+# Extralit server
+docker_build(
+    "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO),
+    context='.',
+    dockerfile='./docker/server/extralit.dockerfile',
+    ignore=['k8s/', '.venv/', '.*', 
+            'src/argilla_server/', '!src/argilla_server/_version.py'],
+)
+
+extralit_k8s_yaml = read_yaml_stream('./k8s/extralit-deployment.yaml')
+for o in extralit_k8s_yaml:
+    for container in o['spec']['template']['spec']['containers']:
+        if container['name'] == 'extralit-server':
+            container['image'] = "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO)
+
+k8s_yaml([
+    encode_yaml_stream(extralit_k8s_yaml), 
+    './k8s/extralit-storage-service.yaml'
+    ])
+k8s_resource(
+    'extralit-deployment',
+    port_forwards=['5555'],
+    labels=['extralit'],
+)
+
+
+# Cert-manager for SSL certificates
+# helm_repo('jetstack', 'https://charts.jetstack.io', labels=['security'])
+# helm_resource(
+#     name='cert-manager', 
+#     chart='jetstack/cert-manager', 
+#     flags=[
+#         '--version=1.7.1',
+#         '--set=installCRDs=true'
+#     ],
+#     labels=['security']
+# )

@@ -79,14 +79,14 @@ async def upload_document(
     
     existing_files = files.list_objects(client, workspace.name, prefix=str(document_create.id), include_version=False)
     if not existing_files.objects and file_data_bytes is not None:
-        object_path = files.get_s3_object_path(document_create.id)
+        object_path = files.get_pdf_s3_object_path(document_create.id)
         response = files.put_object(
             client, bucket=workspace.name, object=object_path, data=file_data_bytes, 
             size=len(file_data_bytes), content_type="application/pdf", 
             metadata=document_create.dict(include={"file_name": True, "pmid": True, "doi": True}))
         
         if not document_create.url:
-            document_create.url = f'api/v1/file/{response.bucket_name}/{response.object_name}'
+            document_create.url = files.get_s3_object_url(response.bucket_name, response.object_name)
     
     existing_document = await check_existing_document(db, document_create)
     if existing_document is not None:
@@ -104,7 +104,7 @@ async def upload_document(
     
     return document.id
 
-@router.get("/documents/by-pmid/{pmid}", responses={200: {"content": {"application/pdf": {}}}})
+@router.get("/documents/by-pmid/{pmid}", response_model=DocumentListItem)
 async def get_document_by_pmid(
     *,
     db: AsyncSession = Depends(get_async_db),
@@ -130,16 +130,8 @@ async def get_document_by_pmid(
         )
     
     document: Document = documents[0]
+    return DocumentListItem.from_orm(document)
 
-    return StreamingResponse(
-        BytesIO(document.file_data), 
-        headers={
-            "Content-Disposition": f'attachment; filename="{document.file_name}"',
-            "X-Document-ID": str(document.id),
-            "X-Document-File-Name": document.file_name,
-        },
-        media_type="application/pdf"
-    )
 
 @router.get("/documents/by-id/{id}", response_model=DocumentListItem)
 async def get_document_by_id(
@@ -167,7 +159,6 @@ async def get_document_by_id(
         )
     
     document: Document = documents[0]
-
     return DocumentListItem.from_orm(document)
 
 
@@ -194,7 +185,7 @@ async def delete_documents_by_workspace_id(*,
     
     _LOGGER.info(f"Deleting {len(documents)} documents")
     for document in documents:
-        object_path = files.get_s3_object_path(document.id)
+        object_path = files.get_pdf_s3_object_path(document.id)
         files.delete_object(client, workspace.name, object_path)
 
     return len(documents)

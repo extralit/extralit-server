@@ -39,7 +39,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV VIRTUAL_ENV="/opt/venv"
 
 RUN uv pip install -q uvicorn[standard]
-RUN uv pip install -q -e ".[postgresql]"
+RUN uv pip install -q -e ".[argilla_server,postgresql]"
   
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
   chown -R argilla:argilla /home/argilla
@@ -52,4 +52,3 @@ EXPOSE 6900
 
 # Set the command for the container
 CMD /bin/bash -c "/bin/bash start_argilla_server.sh"
-

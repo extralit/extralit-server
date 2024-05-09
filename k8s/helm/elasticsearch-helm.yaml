@@ -188,7 +188,7 @@ nodeAffinity:
       - key: role
         operator: In
         values:
-        - index
+        - argilla-server
 
 # The default is to deploy all pods serially. By setting this to parallel all pods are started at
 # the same time when bootstrapping the cluster
