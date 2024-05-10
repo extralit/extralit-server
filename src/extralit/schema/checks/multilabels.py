@@ -13,7 +13,7 @@ def is_valid_list_str(values: List[str]):
 
 def multiselect(series: pd.Series, *, delimiter=',', isin: List[str] = None):
     """ Check that the values in the series are valid lists of strings. """
-    split_values = series.str.split('\s*'+delimiter+'\s*', regex=True)
+    split_values = series.str.split(r'\s*'+delimiter+r'\s*', regex=True)
     checks = split_values.apply(is_valid_list_str)
 
     if isinstance(isin, (set, list)) and isin:

@@ -18,7 +18,8 @@ This module configures the api routes under /api prefix, and
 set the required security dependencies if api security is enabled
 """
 
-from fastapi import FastAPI
+from urllib.parse import urljoin
+from fastapi import APIRouter, Depends, FastAPI, Request, Security
 
 from argilla_server._version import __version__ as argilla_version
 from argilla_server.apis.v0.handlers import (
@@ -74,8 +75,13 @@ from argilla_server.apis.v1.handlers import (
 from argilla_server.apis.v1.handlers import (
     files as files_v1,
 )
+from argilla_server.settings import settings
+from argilla_server.security import auth
+from argilla_server.models import User
 from argilla_server.errors import APIErrorHandler
 from argilla_server.errors.base_errors import __ALL__
+from fastapi.responses import StreamingResponse
+import httpx
 
 
 def create_api_v0():
@@ -136,6 +142,37 @@ def create_api_v1():
 
     return api_v1
 
+def create_models_endpoint():
+    router = APIRouter()
+
+    @router.api_route("/models/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def proxy(request: Request, rest_of_path: str, 
+                    current_user: User = Depends(auth.get_optional_current_user)):
+        url = urljoin(settings.extralit_url, rest_of_path)
+        print(url, current_user)
+        
+        async with httpx.AsyncClient() as client:
+            if request.method == "GET":
+                r = await client.get(url, params=request.query_params)
+            elif request.method == "POST":
+                r = await client.post(url, data=await request.body())
+            elif request.method == "PUT":
+                r = await client.put(url, data=await request.body())
+            elif request.method == "DELETE":
+                r = await client.delete(url, params=request.query_params)
+            else:
+                return {"message": "Method not supported"}
+
+        async def content_generator():
+            async for chunk in r.aiter_bytes():
+                yield chunk
+
+        return StreamingResponse(content_generator(), media_type=r.headers.get('content-type'))
+    
+    return router
+
 
 api_v0 = create_api_v0()
 api_v1 = create_api_v1()
+router = create_models_endpoint()
+api_v1.include_router(router)

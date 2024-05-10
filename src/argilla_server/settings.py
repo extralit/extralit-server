@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     s3_access_key: Optional[str] = Field(description="The access key for the S3 storage")
     s3_secret_key: Optional[str] = Field(description="The secret key for the S3 storage")
 
+    extralit_url: Optional[str] = Field(description="The extralit server url for LLM serving endpoint")
+
     elasticsearch: str = "http://localhost:9200"
     elasticsearch_ssl_verify: bool = True
     elasticsearch_ca_path: Optional[str] = None
@@ -198,6 +200,7 @@ class Settings(BaseSettings):
         values["s3_access_key"] = os.getenv("S3_ACCESS_KEY", values.get("s3_access_key"))
         values["s3_secret_key"] = os.getenv("S3_SECRET_KEY", values.get("s3_secret_key"))
 
+        values['extralit_url'] = os.getenv("EXTRALIT_URL", values.get("extralit_url"))
         return values
 
     @root_validator(skip_on_failure=True)

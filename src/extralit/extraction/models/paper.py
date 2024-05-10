@@ -3,10 +3,12 @@ import logging
 import os
 from collections import deque
 from glob import glob
+from io import BytesIO
 from typing import Dict, Iterator, Tuple, Optional, Union, List
 
 import pandas as pd
 import pandera as pa
+from minio import Minio
 from pandera.api.base.model import MetaModel
 from pandera.io import from_yaml, from_json
 from pydantic.v1 import BaseModel, Field, validator
@@ -52,6 +54,33 @@ class SchemaStructure(BaseModel):
                     schema = from_json(filepath)
                 elif filepath.endswith('.yaml') or filepath.endswith('.yml'):
                     schema = from_yaml(filepath)
+                else:
+                    continue
+
+                if schema.name in schemas or schema.name in exclude:
+                    continue
+
+                schemas[schema.name] = schema
+            except Exception as e:
+                logging.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")
+
+        return cls(schemas=list(schemas.values()))
+
+    @classmethod
+    def from_s3(cls, minio_client: Minio, bucket_name: str, prefix:str='schemas/', exclude: List[str] = []):
+        schemas = {}
+        objects = minio_client.list_objects(bucket_name, prefix=prefix, include_version=False)
+
+        for obj in objects:
+            filepath = obj.object_name
+            try:
+                data = minio_client.get_object(bucket_name, filepath)
+                file_data = BytesIO(data.read())
+
+                if filepath.endswith('.json'):
+                    schema = from_json(file_data)
+                elif filepath.endswith('.yaml') or filepath.endswith('.yml'):
+                    schema = from_yaml(file_data)
                 else:
                     continue
 

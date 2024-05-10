@@ -2,7 +2,9 @@ import pandas as pd
 from fastapi import FastAPI, Depends
 from fastapi.responses import StreamingResponse
 
+from extralit.extraction.models.paper import SchemaStructure
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
+from extralit.server.context.files import get_minio_client
 from extralit.server.context.vectordb import get_weaviate_client
 from extralit.server.context.datasets import get_argilla_dataset
 from extralit.server.utils import astreamer
@@ -22,10 +24,19 @@ async def load_vectorstore_index(
     return {"message": "Hello World", 'client': str(client), 'argilla_client': str(dataset)}
 
 
-@app.get("/question/{reference}/{input}")
-async def create_item(
+@app.get("/schemas/{workspace}")
+async def get_schemas(
+        workspace: str,
+        minio_client=Depends(get_minio_client, use_cache=True),
+    ):
+    ss = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
+    return ss.ordering
+
+
+@app.get("/question/{reference}/{query}")
+async def completion(
         reference: str,
-        input: str,
+        query: str,
         dataset=Depends(get_argilla_dataset, use_cache=True),
         client=Depends(get_weaviate_client, use_cache=True),
     ):
@@ -42,5 +53,5 @@ async def create_item(
     query_engine = index.as_query_engine(
         streaming=True,
     )
-    response = query_engine.query(input)
+    response = query_engine.query(query)
     return StreamingResponse(astreamer(response.response_gen), media_type="text/event-stream")

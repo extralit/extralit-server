@@ -54,3 +54,6 @@ EXPOSE 6900
 CMD /bin/bash -c "/bin/bash start_argilla_server.sh"
  
  
+ 
+ 
+ 

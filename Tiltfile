@@ -44,7 +44,7 @@ docker_build(
     context='.',
     build_args={'ENV': ENV, 'USERS_DB': USERS_DB},
     dockerfile='./docker/server/argilla_server.dockerfile',
-    ignore=['**/__pycache__', 'k8s/', 'argilla/', '.venv/', '.*', 'src/extralit', 'docker/server/extralit.dockerfile'],
+    ignore=['k8s/', 'argilla/', '.venv/', '.*', 'src/extralit', 'docker/server/extralit.dockerfile'],
     live_update=[
         # Sync the source code to the container
         sync('./src/', '/home/argilla/src/'),
@@ -171,7 +171,7 @@ docker_build(
     "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO),
     context='.',
     dockerfile='./docker/server/extralit.dockerfile',
-    ignore=['k8s/', '.venv/', '.*', 'docker/',
+    ignore=['k8s/', '.venv/', '.*', 'docker/', 'argilla/frontend/',
             'src/argilla_server/', '!src/argilla_server/_version.py'],
     live_update=[
         sync('./argilla/', '/home/extralit/argilla/'),
@@ -187,10 +187,10 @@ for o in extralit_k8s_yaml:
             container['image'] = "{DOCKER_REPO}/extralit-server".format(DOCKER_REPO=DOCKER_REPO)
 k8s_yaml([
     encode_yaml_stream(extralit_k8s_yaml), 
-    # './k8s/extralit-storage-service.yaml'
+    './k8s/extralit-storage-service.yaml'
     ])
 k8s_resource(
-    'extralit-deployment',
+    'extralit-server',
     resource_deps=['minio', 'weaviate'],
     port_forwards=['5555'],
     labels=['extralit'],
