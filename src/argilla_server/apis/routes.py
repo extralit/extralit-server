@@ -149,9 +149,9 @@ def create_models_endpoint():
     async def proxy(request: Request, rest_of_path: str, 
                     current_user: User = Depends(auth.get_optional_current_user)):
         url = urljoin(settings.extralit_url, rest_of_path)
-        print(url, current_user)
+        print('PROXY', url, request.query_params)
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             if request.method == "GET":
                 r = await client.get(url, params=request.query_params)
             elif request.method == "POST":

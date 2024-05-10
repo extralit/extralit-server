@@ -54,6 +54,18 @@ spec:
               secretKeyRef:
                 name: extralit-secrets
                 key: S3_SECRET_KEY
+          - name: LANGFUSE_HOST
+            value: "http://langfuse-server:4000"
+          - name: LANGFUSE_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: extralit-secrets
+                key: LANGFUSE_SECRET_KEY
+          - name: LANGFUSE_PUBLIC_KEY
+            valueFrom:
+              secretKeyRef:
+                name: extralit-secrets
+                key: LANGFUSE_PUBLIC_KEY
         # volumeMounts:
         #   - name: extralit-storage
         #     mountPath: /tmp/

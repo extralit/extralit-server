@@ -34,7 +34,7 @@ helm_resource(
         '--values=./k8s/helm/elasticsearch-helm.yaml'],
     deps=['./k8s/helm/elasticsearch-helm.yaml', 'elastic'],
     port_forwards=['9200'],
-    labels=['elasticsearch']
+    labels=['argilla-server']
 )
 
 
