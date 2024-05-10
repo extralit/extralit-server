@@ -4,7 +4,7 @@ import os
 from typing import Any, BinaryIO, Dict, List, Optional, Union
 from urllib.parse import urlparse
 from uuid import UUID
-from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata, FileObject
+from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata, FileObjectResponse
 from argilla_server.settings import settings
 from fastapi import HTTPException
 from minio import Minio, S3Error
@@ -54,16 +54,16 @@ def list_objects(client: Minio, bucket: str, prefix: Optional[str] = None, inclu
     
 
 def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str] = None, 
-                     include_versions=False) -> FileObject:
+               include_versions=False) -> FileObjectResponse:
     try:
         stat = client.stat_object(bucket, object, version_id=version_id)
         response = client.get_object(bucket, object, version_id=stat.version_id)
 
         if include_versions:
-            versions = list_objects(client, bucket, prefix=object)
-            return FileObject(response=response, metadata=stat, versions=versions)
+            versions = list_objects(client, bucket, prefix=object, include_version=True)
+            return FileObjectResponse(response=response, metadata=stat, versions=versions)
 
-        return FileObject(response=response, metadata=stat)
+        return FileObjectResponse(response=response, metadata=stat)
     
     except S3Error as se:
         _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}", stack_info=True)
