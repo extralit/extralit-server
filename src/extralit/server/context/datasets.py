@@ -16,6 +16,6 @@ def get_argilla_dataset(name="Table-Preprocessing", workspace="itn-recalibration
     except Exception as e:
         print(e)
 
-    dataset = rg.FeedbackDataset.from_argilla(name=name, workspace=workspace)
+    dataset = rg.FeedbackDataset.from_argilla(name=name, workspace=workspace, with_documents=False)
 
     return dataset

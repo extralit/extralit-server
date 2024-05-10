@@ -72,7 +72,8 @@ def extract_entity(
         extractions: PaperExtraction,
         schema: pa.DataFrameSchema,
         schema_structure: SchemaStructure,
-        verbose=None) -> Tuple[pd.DataFrame, ResponseResult]:
+        similarity_top_k=20,
+        verbose=None, **kwargs) -> Tuple[pd.DataFrame, ResponseResult]:
     prompt = f"""
 You are a highly detailed-oriented data extractor with research domain expertise.
 Use Chain-of-Thought to create a mapping of the table fields from the context to the `{schema.name}` schema fields.
@@ -88,6 +89,9 @@ It is not necessary to include "NA" values in the JSON in your response.
 
     # Inject prior extraction data into the query
     for dep_schema in dep_schemas:
+        if dep_schema not in extractions.extractions:
+            raise ValueError(f"Dependency '{dep_schema}' not found in extractions")
+
         dep_extraction = filter_unique_columns(extractions[dep_schema])
         prompt += f"###{dep_schema}###\n`\n{dep_extraction.to_json(orient='index')}\n`\n"
 
@@ -102,7 +106,9 @@ It is not necessary to include "NA" values in the JSON in your response.
         filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)]
     )
 
-    response = query_rag_llm(prompt, index, output_cls=output_cls, similarity_top_k=20, filters=filters)
+    response = query_rag_llm(
+        prompt, index=index, output_cls=output_cls,
+        similarity_top_k=similarity_top_k, filters=filters, **kwargs)
 
     df = convert_response_to_dataframe(response)
     df = generate_reference_columns(df, schema)

@@ -13,6 +13,7 @@ from pandera.api.base.model import MetaModel
 from pandera.io import from_yaml, from_json
 from pydantic.v1 import BaseModel, Field, validator
 
+from extralit.convert.json_table import json_to_df
 from extralit.schema.checks import register_check_methods
 
 register_check_methods()
@@ -153,10 +154,10 @@ class SchemaStructure(BaseModel):
 
 
 class PaperExtraction(BaseModel):
+    reference: str
     extractions: Dict[str, pd.DataFrame] = Field(default_factory=dict)
     schemas: SchemaStructure = Field(default_factory=SchemaStructure)
     durations: Dict[str, Optional[float]] = Field(default_factory=dict)
-    reference: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
