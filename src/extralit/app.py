@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 import argilla as rg
 
 from extralit.convert.json_table import json_to_df
-from extralit.extraction.extraction import extract_entity
+from extralit.extraction.extraction import extract_schema
 from extralit.extraction.models.paper import SchemaStructure, PaperExtraction
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.server.context.files import get_minio_client
@@ -105,12 +105,7 @@ async def extract(
     )
 
     ### Extract entities ###
-    df, response = extract_entity(
-        index=index,
-        extractions=extractions,
-        schema=schema,
-        schema_structure=schemas,
-        verbose=1,
-    )
+    df, response = extract_schema(schema=schema, extractions=extractions, index=index, verbose=1,
+                                  schema_structure=schemas)
 
     return df.to_json(orient='table')

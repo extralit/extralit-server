@@ -57,7 +57,7 @@ def pandera_dtype_to_python_type(pandera_dtype: Type[pa.typing.Series]) -> Type:
     return Optional[str]
 
 
-def pandera_column_to_pydantic_field(column: pa.Column, skip_validators=True) -> Field:
+def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=False) -> Field:
     description = column.description if column.description else ""
 
     if column.checks:
@@ -69,32 +69,32 @@ def pandera_column_to_pydantic_field(column: pa.Column, skip_validators=True) ->
     for check in column.checks:
         if 'greater_than_or_equal_to' == check.name:
             validators['ge'] = check.statistics['min_value']
-            if skip_validators:
+            if not validate_assignment:
                 description += f"\n{check.name}: {next(iter(check.statistics.values()), None)}"
         elif 'less_than_or_equal_to' == check.name:
             validators['le'] = check.statistics['max_value']
-            if skip_validators:
+            if not validate_assignment:
                 description += f"\n{check.name}: {next(iter(check.statistics.values()), None)}"
         elif 'less_than' == check.name:
             validators['lt'] = check.statistics['max_value']
-            if skip_validators:
+            if not validate_assignment:
                 description += f"\n{check.name}: {next(iter(check.statistics.values()), None)}"
         elif 'greater_than' == check.name:
             validators['gt'] = check.statistics['min_value']
-            if skip_validators:
+            if not validate_assignment:
                 description += f"\n{check.name}: {next(iter(check.statistics.values()), None)}"
 
         elif 'str_matches' == check.name:
             validators['regex'] = check.statistics['pattern']
-            if skip_validators:
+            if not validate_assignment:
                 extra['str_matches'] = check.statistics['pattern']
         elif 'str_length' == check.name and 'min_value' in check.statistics:
             validators['min_length'] = check.statistics['min_value']
-            if skip_validators:
+            if not validate_assignment:
                 extra.setdefault('str_length', {})['min_value'] = check.statistics['min_value']
         elif 'str_length' == check.name and 'max_value' in check.statistics:
             validators['max_length'] = check.statistics['max_value']
-            if skip_validators:
+            if not validate_assignment:
                 extra.setdefault('str_length', {})['max_value'] = check.statistics['max_value']
 
         elif 'str_startswith' == check.name or 'str_endswith' == check.name:
@@ -119,15 +119,20 @@ def pandera_column_to_pydantic_field(column: pa.Column, skip_validators=True) ->
     if description.endswith("\nSpecifications:"):
         description = description.replace("\nSpecifications:", "")
 
-    if skip_validators:
+    if not validate_assignment:
         return Field(None, title=column.title, description=description, json_schema_extra=extra)
 
     return Field(None, title=column.title, description=description, **validators, json_schema_extra=extra)
 
 
-def convert_schema_to_pydantic_model(schema: pa.DataFrameSchema, top_class: str = None, lower_class: str = None,
-                                     singleton=False, skip_validators=True, ) \
-        -> Type[BaseModelForLlamaIndexClsOutput]:
+def build_extraction_model(
+        schema: pa.DataFrameSchema,
+        subset: List[str]=None,
+        top_class: Optional[str] = None,
+        lower_class: Optional[str] = None,
+        singleton=False,
+        validate_assignment=False,
+        ) -> Type[BaseModelForLlamaIndexClsOutput]:
     """
     Converts a Pandera DataFrameSchema to a Pydantic model. This model encodes checks and dtypes which will be used as a
     prompt to guide an LLM's JSON output. The function dynamically creates Pydantic models with fields based on the
@@ -137,11 +142,13 @@ def convert_schema_to_pydantic_model(schema: pa.DataFrameSchema, top_class: str 
 
     Args:
         schema (pa.DataFrameSchema): The Pandera DataFrameSchema to convert.
+        subset (List[str], optional): A list of column names to include in the Pydantic model. Defaults to None.
         top_class (str, optional): The name of the top-level Pydantic model. Defaults to a plural form of the schema name.
         lower_class (str, optional): The name of the lower-level Pydantic model. Defaults to the schema name.
         singleton (bool, optional): Whether the schema represents a singleton. Defaults to False.
             When True, the top-level model will not contain a list of lower-level model and only contain a single
             value for each field.
+        validate_assignment: Whether to skip validators in the Pydantic model. Defaults to True.
 
     Returns:
         Type[BaseModelForLlamaIndexClsOutput]: The Pydantic model that represents the schema.
@@ -156,16 +163,17 @@ def convert_schema_to_pydantic_model(schema: pa.DataFrameSchema, top_class: str 
     columns = {
         field_name: (
             pandera_dtype_to_python_type(column.dtype),
-            pandera_column_to_pydantic_field(column, skip_validators=skip_validators)
+            pandera_column_to_pydantic_field(column, validate_assignment=validate_assignment)
         )
-        for field_name, column in schema.columns.items()
+        for field_name, column in schema.columns.items() \
+        if not subset or field_name in subset
     }
 
     # Add fields from schema.index
     indexes = {
         index.name: (
             pandera_dtype_to_python_type(index.dtype),
-            pandera_column_to_pydantic_field(index, skip_validators=skip_validators)
+            pandera_column_to_pydantic_field(index, validate_assignment=validate_assignment)
         )
         for index in schema.index.indexes
     } if hasattr(schema.index, 'indexes') else {}

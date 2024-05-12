@@ -16,12 +16,13 @@ from pydantic.v1 import BaseModel
 
 from extralit.extraction.models.paper import PaperExtraction, SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
-from extralit.extraction.schema import convert_schema_to_pydantic_model
+from extralit.extraction.schema import build_extraction_model
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
+from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns, filter_unique_columns
 
 
-def query_rag_llm(
+def query_index(
         prompt: str,
         index: VectorStoreIndex,
         output_cls=BaseModel,
@@ -47,39 +48,33 @@ def query_rag_llm(
     return obs_response
 
 
-def convert_response_to_dataframe(response: Response) -> pd.DataFrame:
-    try:
-        df: pd.DataFrame = response.response.to_df()
-    except AttributeError:
-        logging.error(f"Failed to convert response to DataFrame: {response}")
-        df = pd.DataFrame()
-    return df
+def extract_schema(schema: pa.DataFrameSchema, extractions: PaperExtraction, index: VectorStoreIndex,
+                   subset: Optional[List[str]] = None, headers: Optional[List[str]] = None, similarity_top_k=20,
+                   text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL), verbose=None,
+                   **kwargs) -> Tuple[pd.DataFrame, ResponseResult]:
+    """
+    Extract a schema from a paper using the RAG LLM.
+    Args:
+        schema (pa.DataFrameSchema): The schema to extract.
+        extractions (PaperExtraction): The extractions from the paper.
+        index (VectorStoreIndex): The index to use for the extraction.
+        similarity_top_k (int): The number of similar documents to retrieve. Defaults to 20.
+        subset (Optional[List[str]]): A list of column names to include in the Pydantic model. Defaults to None.
+        headers (Optional[List[str]]): The headers to filter the documents by. Defaults to None.
+        text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
+        verbose (Optional[int]): The verbosity level. Defaults to None.
+        **kwargs (Dict): Additional keyword arguments to pass to the `query_rag_llm` and `as_query_engine` function.
+            text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
 
-
-def generate_reference_columns(df: pd.DataFrame, schema: pa.DataFrameSchema):
-    index_names = [index.name.lower() for index in schema.index.indexes] \
-        if hasattr(schema.index, 'indexes') else []
-    for index_name in index_names:
-        if index_name not in df.columns:
-            df[index_name] = 'NOTMATCHED'
-    if index_names:
-        df = df.set_index(index_names, verify_integrity=False)
-    return df
-
-
-def extract_entity(
-        index: VectorStoreIndex,
-        extractions: PaperExtraction,
-        schema: pa.DataFrameSchema,
-        schema_structure: SchemaStructure,
-        similarity_top_k=20,
-        verbose=None, **kwargs) -> Tuple[pd.DataFrame, ResponseResult]:
+    Returns:
+        Tuple[pd.DataFrame, ResponseResult]: The extracted DataFrame and the ResponseResult.
+    """
     prompt = f"""
 You are a highly detailed-oriented data extractor with research domain expertise.
 Use Chain-of-Thought to create a mapping of the table fields from the context to the `{schema.name}` schema fields.
 It is not necessary to include "NA" values in the JSON in your response. 
 """
-
+    schema_structure = extractions.schemas
     dep_schemas = schema_structure.upstream_dependencies[schema.name]
     if dep_schemas:
         prompt += \
@@ -99,45 +94,26 @@ It is not necessary to include "NA" values in the JSON in your response.
         logging.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
 
     # Call the call_rag_llm function
-    output_cls = convert_schema_to_pydantic_model(
-        schema, top_class=schema.name + 's', lower_class=schema.name, skip_validators=True)
+    output_cls = build_extraction_model(
+        schema, subset=subset, top_class=schema.name + 's', lower_class=schema.name, validate_assignment=False)
 
     filters = MetadataFilters(
         filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)]
     )
+    if headers:
+        filters.filters.append(MetadataFilter(key="header", value=headers, operator=FilterOperator.IN))
 
-    response = query_rag_llm(
+    response = query_index(
         prompt, index=index, output_cls=output_cls,
-        similarity_top_k=similarity_top_k, filters=filters, **kwargs)
+        similarity_top_k=similarity_top_k, filters=filters,
+        text_qa_template=text_qa_template, response_mode="compact", **kwargs)
 
     df = convert_response_to_dataframe(response)
     df = generate_reference_columns(df, schema)
     return df, ResponseResult(**response.__dict__)
 
 
-def extract_with_fallback(
-        index: VectorStoreIndex,
-        extractions: PaperExtraction,
-        responses: ResponseResults,
-        schema: pa.DataFrameSchema,
-        schema_structure: SchemaStructure,
-        models: List[str],
-        verbose: Optional[int]) -> pd.DataFrame:
-    for model in models:
-        try:
-            index.service_context.llm.model = model
-            df, responses[schema.name] = extract_entity(index, extractions=extractions, schema=schema,
-                                                        schema_structure=schema_structure, verbose=verbose)
-            return df
-        except Exception as e:
-            logging.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")
-            if verbose >= 2:
-                raise e
-
-    return pd.DataFrame()
-
-
-def extract_from_schemas(
+def extract_paper(
         paper: pd.Series,
         schema_structure: SchemaStructure,
         index: VectorStoreIndex = None,
@@ -173,16 +149,17 @@ def extract_from_schemas(
     assert index.service_context.llm.model == llm_models[0], \
         f"LLM model mismatch: {index.service_context.llm.model} != {llm_models[0]}"
 
-    extractions = PaperExtraction(extractions={}, schemas=schema_structure, reference=reference)
-    responses = ResponseResults(items={}, docs_metadata={id: doc.metadata for id, doc in index.docstore.docs.items()})
+    extractions = PaperExtraction(
+        extractions={}, schemas=schema_structure, reference=reference)
+    responses = ResponseResults(
+        items={}, docs_metadata={id: doc.metadata for id, doc in index.docstore.docs.items()})
 
     ### Extract entities ###
-    for schema_name in schema_structure.ordering:
-        schema = schema_structure[schema_name]
+    for schema_name in extractions.schemas.ordering:
+        schema = extractions.schemas[schema_name]
 
-        df = extract_with_fallback(
-            index, extractions=extractions, responses=responses, schema=schema,
-            schema_structure=schema_structure, models=llm_models, verbose=verbose)
+        df = extract_schema_with_fallback(schema=schema, extractions=extractions, index=index, responses=responses,
+                                          models=llm_models, verbose=verbose)
 
         if schema.index.name:
             df = assign_unique_index(df, schema, index_name=schema.index.name, prefix=get_prefix(schema), n_digits=2)
@@ -201,11 +178,19 @@ def extract_from_schemas(
     return extractions, responses
 
 
-def filter_unique_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Drop columns that have the same value in all rows.
-    """
-    if len(df) > 1:
-        return df.dropna(axis='columns', how='all').loc[:, (df.astype(str).nunique() > 1)]
-    else:
-        return df
+def extract_schema_with_fallback(schema: pa.DataFrameSchema, extractions: PaperExtraction, index: VectorStoreIndex,
+                                 responses: ResponseResults, models: List[str], verbose: Optional[int]=0) -> pd.DataFrame:
+    for model in models:
+        try:
+            index.service_context.llm.model = model
+            df, responses[schema.name] = extract_schema(schema=schema, extractions=extractions, index=index,
+                                                        verbose=verbose)
+            return df
+        except Exception as e:
+            logging.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")
+            if verbose >= 2:
+                raise e
+
+    return pd.DataFrame()
+
+

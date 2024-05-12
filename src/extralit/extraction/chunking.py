@@ -18,7 +18,7 @@ def create_documents(
         preprocessing_path='data/preprocessing/nougat/',
         preprocessing_dataset: Optional[rg.FeedbackDataset] = None,
         response_status=['submitted'],
-        exclude_llm_metadata_keys=['page_number', 'reference'],
+        exclude_llm_metadata_keys=['type', 'page_number', 'reference'],
         **nougat_kwargs) \
         -> Tuple[List[Document], List[Document]]:
     """
