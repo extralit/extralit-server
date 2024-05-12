@@ -4,7 +4,8 @@ import argilla as rg
 import pandas as pd
 
 from extralit.convert.json_table import json_to_df, is_json_table
-from extralit.extraction.models.paper import PaperExtraction, SchemaStructure
+from extralit.extraction.models.paper import PaperExtraction
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.pipeline.ingest.record import get_record_data
 from extralit.preprocessing.segment import Segments, TableSegment, FigureSegment
 

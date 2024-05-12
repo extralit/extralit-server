@@ -2,7 +2,7 @@ from pydantic.v1 import BaseModel, Field
 from typing import Dict
 
 from extralit.convert.json_table import json_to_df
-from extralit.extraction.models.paper import SchemaStructure
+from extralit.extraction.models.schema import SchemaStructure
 
 
 class ExtractionRequest(BaseModel):

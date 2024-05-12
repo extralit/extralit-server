@@ -1,4 +1,5 @@
 import logging
+
 import os
 import warnings
 from os.path import join, exists
@@ -14,12 +15,15 @@ from llama_index.core.vector_stores import (
     FilterOperator, )
 from pydantic.v1 import BaseModel
 
-from extralit.extraction.models.paper import PaperExtraction, SchemaStructure
+from extralit.extraction.models.paper import PaperExtraction
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
 from extralit.extraction.schema import build_extraction_model
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
 from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns, filter_unique_columns
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def query_index(
@@ -53,7 +57,7 @@ def extract_schema(schema: pa.DataFrameSchema, extractions: PaperExtraction, ind
                    text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL), verbose=None,
                    **kwargs) -> Tuple[pd.DataFrame, ResponseResult]:
     """
-    Extract a schema from a paper using the RAG LLM.
+    Extract a complete table based on schema using the RAG on a paper.
     Args:
         schema (pa.DataFrameSchema): The schema to extract.
         extractions (PaperExtraction): The extractions from the paper.
@@ -91,7 +95,7 @@ It is not necessary to include "NA" values in the JSON in your response.
         prompt += f"###{dep_schema}###\n`\n{dep_extraction.to_json(orient='index')}\n`\n"
 
     if verbose:
-        logging.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
+        _LOGGER.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
 
     # Call the call_rag_llm function
     output_cls = build_extraction_model(
@@ -173,7 +177,7 @@ def extract_paper(
         with open(join(interim_save_dir, 'responses.json'), 'w') as file:
             file.write(responses.json())
     except Exception as e:
-        logging.error(f"Interim save responses: {e}")
+        _LOGGER.error(f"Interim save responses: {e}")
 
     return extractions, responses
 
@@ -187,7 +191,8 @@ def extract_schema_with_fallback(schema: pa.DataFrameSchema, extractions: PaperE
                                                         verbose=verbose)
             return df
         except Exception as e:
-            logging.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")
+            _LOGGER.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")
+
             if verbose >= 2:
                 raise e
 

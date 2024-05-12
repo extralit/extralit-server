@@ -3,7 +3,8 @@ import os
 import pandas as pd
 import pytest
 
-from extralit.extraction.models.paper import SchemaStructure, PaperExtraction
+from extralit.extraction.models.paper import PaperExtraction
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.schema.checks import register_check_methods
 
 register_check_methods()

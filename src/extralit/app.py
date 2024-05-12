@@ -6,7 +6,8 @@ import argilla as rg
 
 from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
-from extralit.extraction.models.paper import SchemaStructure, PaperExtraction
+from extralit.extraction.models.paper import PaperExtraction
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.server.context.files import get_minio_client
 from extralit.server.context.llamaindex import get_langfuse_global
