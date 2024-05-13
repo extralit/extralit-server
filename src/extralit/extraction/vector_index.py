@@ -17,7 +17,7 @@ from llama_index.llms.openai import OpenAI
 from weaviate import Client
 
 from extralit.extraction.chunking import create_documents
-from extralit.extraction.query import query_weaviate_db, delete_from_weaviate_db
+from extralit.extraction.query import query_weaviate_db, delete_from_weaviate_db, vectordb_has_document
 from extralit.extraction.storage import get_storage_context
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
@@ -97,8 +97,7 @@ def create_or_load_vectorstore_index(paper: pd.Series,
     local_dir = join(persist_dir, paper.name, embed_model)
 
     use_weaviate = weaviate_client is not None
-    has_document_in_vecstore = query_weaviate_db(
-        weaviate_client, index_name, filters={'reference': paper.name}, properties=['doc_id', 'reference'], limit=1)
+    has_document_in_vecstore = vectordb_has_document(paper, weaviate_client, index_name)
     if reindex or (not exists(local_dir) and not has_document_in_vecstore):
         assert preprocessing_path is not None or preprocessing_dataset is not None, \
             "Either preprocessing_path or preprocessing_dataset must be given"

@@ -15,7 +15,7 @@ register_check_methods()
 class PaperExtraction(BaseModel):
     reference: str
     extractions: Dict[str, pd.DataFrame] = Field(default_factory=dict)
-    schemas: SchemaStructure = Field(default_factory=SchemaStructure)
+    schemas: SchemaStructure = Field(..., description="The schema structure of the extraction.")
     durations: Dict[str, Optional[float]] = Field(default_factory=dict)
 
     class Config:

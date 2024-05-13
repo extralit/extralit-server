@@ -120,7 +120,7 @@ class SchemaStructure(BaseModel):
             item = str(item)
 
         for schema in self.schemas:
-            if schema.name == item:
+            if schema.name.lower() == item.lower():
                 return schema
         raise KeyError(f"No schema found for '{item}'")
 

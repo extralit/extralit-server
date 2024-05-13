@@ -1,8 +1,11 @@
+from typing import Optional
+
 import pandas as pd
-from fastapi import FastAPI, Depends, Body
+from fastapi import FastAPI, Depends, Body, status
 from fastapi.responses import StreamingResponse
 
 import argilla as rg
+from llama_index.core import BaseCallbackHandler
 
 from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
@@ -66,31 +69,31 @@ async def completion(
     return StreamingResponse(astreamer(response.response_gen), media_type="text/event-stream")
 
 
-@app.get("/extract/{reference}/{schema_name}")
+@app.post("/extract/{reference}/{schema_name}", status_code=status.HTTP_201_CREATED)
 async def extract(
         reference: str,
         schema_name: str,
-        request: ExtractionRequest = Body(...),
+        extraction_request: ExtractionRequest = Body(...),
         dataset=Depends(get_argilla_dataset, use_cache=True),
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
         minio_client=Depends(get_minio_client, use_cache=True),
-        global_handler=Depends(get_langfuse_global, use_cache=True),
+        global_handler: Optional[BaseCallbackHandler]=Depends(get_langfuse_global, use_cache=True),
     ):
-
     schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=dataset.workspace.name)
     schema = schemas[schema_name]
 
-    previous_extractions = {}
-    for schema_name, json_str in request.previous_extractions.items():
-        previous_extractions[schema_name] = json_to_df(json_str, schema=schemas[schema_name])
+    extraction_dfs = {}
+    for schema_name, extraction_dict in extraction_request.extractions.items():
+        schema = schemas[schema_name]
+        extraction_dfs[schema.name] = pd.DataFrame(extraction_dict)
 
     extractions = PaperExtraction(
         reference=reference,
-        extractions=previous_extractions,
+        extractions=extraction_dfs,
         schemas=schemas)
 
     ### Create or load the index ###
-    if hasattr(global_handler, 'set_trace_params'):
+    if global_handler is not None and hasattr(global_handler, 'set_trace_params'):
         global_handler.set_trace_params(
             name=f"extract-{reference}",
             tags=[reference],
@@ -106,7 +109,10 @@ async def extract(
     )
 
     ### Extract entities ###
-    df, response = extract_schema(schema=schema, extractions=extractions, index=index, verbose=1,
-                                  schema_structure=schemas)
+    df, response = extract_schema(
+        schema=schema, extractions=extractions, index=index, schema_structure=schemas,
+        include_fields=extraction_request.columns,
+        headers=extraction_request.headers,
+        verbose=1,)
 
     return df.to_json(orient='table')

@@ -52,10 +52,17 @@ def query_index(
     return obs_response
 
 
-def extract_schema(schema: pa.DataFrameSchema, extractions: PaperExtraction, index: VectorStoreIndex,
-                   subset: Optional[List[str]] = None, headers: Optional[List[str]] = None, similarity_top_k=20,
-                   text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL), verbose=None,
-                   **kwargs) -> Tuple[pd.DataFrame, ResponseResult]:
+def extract_schema(
+        schema: pa.DataFrameSchema,
+        extractions: PaperExtraction,
+        index: VectorStoreIndex,
+        include_fields: Optional[List[str]] = None,
+        headers: Optional[List[str]] = None,
+        similarity_top_k=20,
+        text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL),
+        verbose=None,
+        **kwargs,
+    ) -> Tuple[pd.DataFrame, ResponseResult]:
     """
     Extract a complete table based on schema using the RAG on a paper.
     Args:
@@ -63,7 +70,7 @@ def extract_schema(schema: pa.DataFrameSchema, extractions: PaperExtraction, ind
         extractions (PaperExtraction): The extractions from the paper.
         index (VectorStoreIndex): The index to use for the extraction.
         similarity_top_k (int): The number of similar documents to retrieve. Defaults to 20.
-        subset (Optional[List[str]]): A list of column names to include in the Pydantic model. Defaults to None.
+        include_fields (Optional[List[str]]): A list of column names to include in the Pydantic model. Defaults to None.
         headers (Optional[List[str]]): The headers to filter the documents by. Defaults to None.
         text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
         verbose (Optional[int]): The verbosity level. Defaults to None.
@@ -99,13 +106,15 @@ It is not necessary to include "NA" values in the JSON in your response.
 
     # Call the call_rag_llm function
     output_cls = build_extraction_model(
-        schema, subset=subset, top_class=schema.name + 's', lower_class=schema.name, validate_assignment=False)
+        schema, include_fields=include_fields, top_class=schema.name + 's', lower_class=schema.name, validate_assignment=False)
 
     filters = MetadataFilters(
         filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)]
     )
     if headers:
         filters.filters.append(MetadataFilter(key="header", value=headers, operator=FilterOperator.IN))
+
+    print('filters', filters)
 
     response = query_index(
         prompt, index=index, output_cls=output_cls,

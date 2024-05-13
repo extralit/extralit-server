@@ -177,7 +177,7 @@ docker_build(
         sync('./argilla/', '/home/extralit/argilla/'),
         sync('./src/', '/home/extralit/src/'),
         sync('./pyproject.toml', '/home/extralit/pyproject.toml'),
-        run('/bin/bash -c "uv pip install --upgrade -e .[extraction,llm]"', trigger='./pyproject.toml'),
+        run('uv pip install --upgrade -e ".[extraction,llm]"', trigger='./pyproject.toml'),
     ]
 )
 extralit_k8s_yaml = read_yaml_stream('./k8s/extralit-deployment.yaml')

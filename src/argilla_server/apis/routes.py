@@ -18,6 +18,7 @@ This module configures the api routes under /api prefix, and
 set the required security dependencies if api security is enabled
 """
 
+import json
 from urllib.parse import urljoin
 from fastapi import APIRouter, Depends, FastAPI, Request, Security
 
@@ -155,9 +156,13 @@ def create_models_endpoint():
             if request.method == "GET":
                 r = await client.get(url, params=request.query_params)
             elif request.method == "POST":
-                r = await client.post(url, data=await request.body())
+                data = await request.json()
+                print('data', data)
+                r = await client.post(url, json=data)
             elif request.method == "PUT":
-                r = await client.put(url, data=await request.body())
+                data = await request.json()
+                print('data', data)
+                r = await client.put(url, data=data)
             elif request.method == "DELETE":
                 r = await client.delete(url, params=request.query_params)
             else:

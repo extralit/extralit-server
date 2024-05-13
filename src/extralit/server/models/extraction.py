@@ -1,19 +1,25 @@
-from pydantic.v1 import BaseModel, Field
-from typing import Dict
+from typing import Dict, Optional, List, Any, Union, Annotated, Any
+from pydantic import BaseModel, Field
 
-from extralit.convert.json_table import json_to_df
-from extralit.extraction.models.schema import SchemaStructure
+
+SchemaName = Annotated[str, Field(description="The schema name of the extraction.", examples=["schema_name"])]
+FieldName = Annotated[str, Field(description="The name of the field.", examples=["field_name"])]
+Value = Annotated[Any, Field(description="The value of the field.", examples=["value"])]
+
+Data = List[Dict[FieldName, Value]]
+Extractions = Dict[SchemaName, Data]
 
 
 class ExtractionRequest(BaseModel):
     reference: str
-    workspace: str
-    current_extraction: Dict[str, str] = Field(
+    schema_name: str
+    extractions: Extractions = Field(
         default_factory=dict,
-        description="Current extraction where the key is the schema name and "
-                    "the value is a tuple specifying the cell range."
+        description="All of the extraction data for previously extracted as well as the extraction table of "
+                    "`schema_name` to be extracted."
     )
-    previous_extractions: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Previous extraction tables where the key is the schema name and "
-                    "the value is json-encoded dataframe.")
+    columns: list[str] | None = None
+    headers: list[str] | None = None
+    workspace: str | None = None
+
+

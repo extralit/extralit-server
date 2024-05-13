@@ -38,6 +38,7 @@ def get_paper_tables(paper: pd.Series,
 
     segments = Segments()
     for record in records:
+        print(record.id, record.metadata)
         values = get_record_data(record,
                                  fields=['text-1', 'text-2', 'text-3', 'text-4', 'text-5', 'header'],
                                  answers=['text-correction', 'header-correction', 'footer-correction', 'ranking',
@@ -70,6 +71,7 @@ def get_paper_tables(paper: pd.Series,
         type = values.get('number', 'table').split(' ')[0].lower()
         if type == 'figure':
             segment = FigureSegment(
+                id=record.id,
                 header=header.strip(),
                 footer=values.get('footer-correction', None),
                 page_number=values.get('page_number', None),
@@ -79,6 +81,7 @@ def get_paper_tables(paper: pd.Series,
             )
         else:
             segment = TableSegment(
+                id=record.id,
                 header=header.strip(),
                 footer=values.get('footer-correction', None),
                 page_number=values.get('page_number', None),

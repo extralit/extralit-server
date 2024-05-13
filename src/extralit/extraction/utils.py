@@ -4,12 +4,14 @@ import pandas as pd
 import pandera as pa
 from llama_index.core import Response
 
+_LOGGER = logging.getLogger(__name__)
 
 def convert_response_to_dataframe(response: Response) -> pd.DataFrame:
     try:
         df: pd.DataFrame = response.response.to_df()
-    except AttributeError:
-        logging.error(f"Failed to convert response to DataFrame: {response}")
+    except AttributeError as ae:
+        _LOGGER.error(f"Failed to convert response to DataFrame: {ae}\n"
+                      f"Response: {response.response}")
         df = pd.DataFrame()
     return df
 

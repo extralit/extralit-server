@@ -101,7 +101,7 @@ def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=Fals
             description += f'\n{check.name}: "{check.statistics["string"]}"'
 
         elif 'suggestion' == check.name:
-            description += f"\nSuggestion: {stringify_to_instructions(check.statistics['values'])}"
+            # description += f"\nSuggestion: {stringify_to_instructions(check.statistics['values'])}"
             extra['suggestion'] = check.statistics['values']
         elif 'isin' == check.name:
             description += f"\nAllowed values: {stringify_to_instructions(check.statistics['allowed_values'])}"
@@ -127,7 +127,7 @@ def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=Fals
 
 def build_extraction_model(
         schema: pa.DataFrameSchema,
-        subset: List[str]=None,
+        include_fields: List[str]=None,
         top_class: Optional[str] = None,
         lower_class: Optional[str] = None,
         singleton=False,
@@ -142,7 +142,7 @@ def build_extraction_model(
 
     Args:
         schema (pa.DataFrameSchema): The Pandera DataFrameSchema to convert.
-        subset (List[str], optional): A list of column names to include in the Pydantic model. Defaults to None.
+        include_fields (List[str], optional): A list of column names to include in the Pydantic model. Defaults to None.
         top_class (str, optional): The name of the top-level Pydantic model. Defaults to a plural form of the schema name.
         lower_class (str, optional): The name of the lower-level Pydantic model. Defaults to the schema name.
         singleton (bool, optional): Whether the schema represents a singleton. Defaults to False.
@@ -166,7 +166,7 @@ def build_extraction_model(
             pandera_column_to_pydantic_field(column, validate_assignment=validate_assignment)
         )
         for field_name, column in schema.columns.items() \
-        if not subset or field_name in subset
+        if not include_fields or field_name in include_fields
     }
 
     # Add fields from schema.index

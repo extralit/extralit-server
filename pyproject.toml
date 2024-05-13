@@ -22,7 +22,6 @@ maintainers = [
     { name = "argilla", email = "contact@argilla.io" }
 ]
 dependencies = [
-    "fastapi >= 0.103.1,< 1.0.0",
     "pydantic",
     "rich != 13.1.0",
     "tqdm",
@@ -79,12 +78,13 @@ extraction = [
     "argilla",
     "hypothesis",
     "html5lib",
+    "fastapi < 1.0.0",
+    "pydantic",
     "pypandoc ~= 1.13",
     "weaviate-client ~= 3.26.2",
     "beautifulsoup4 ~= 4.12.2",
     "pandas ~= 2.2.2",
     "pandera[io] ~= 0.18.3",
-    "pydantic ~= 2.7.1",
     "numpy ~= 1.26.4",
     "spacy ~= 3.7.2",
     "pyarrow == 14.*",
@@ -111,8 +111,8 @@ pdf = [
     "python-doctr ~= 0.8.1",
 ]
 llm = [
-    "llama-index >= 0.10.29",
-    "llama-index-core >= 0.10.29",
+    "llama-index ~= 0.10.33",
+    "llama-index-core ~= 0.10.33",
     "llama-index-llms-openai",
     "llama-index-embeddings-openai",
     "llama-index-multi-modal-llms-openai",

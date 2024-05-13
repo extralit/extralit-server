@@ -81,3 +81,9 @@ def delete_from_weaviate_db(weaviate_client: Client, doc_ids: List[str], index_n
     logging.info(f"Deleted {len(entries)} documents from Weaviate index {index_name}")
     print(f"Deleted {len(entries)} documents from Weaviate index {index_name}")
     return len(entries)
+
+
+def vectordb_has_document(paper, weaviate_client, index_name):
+    has_document_in_vecstore = query_weaviate_db(
+        weaviate_client, index_name, filters={'reference': paper.name}, properties=['doc_id', 'reference'], limit=1)
+    return has_document_in_vecstore

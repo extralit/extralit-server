@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import re
 from typing import List, Optional, Union, Dict, Literal, Any
 
@@ -8,6 +9,7 @@ import pandera as pa
 
 from extralit.schema.checks.utils import make_same_length_arguments
 
+_LOGGER = logging.getLogger(__name__)
 
 def drop_single_value_index_names(df: pd.DataFrame) -> pd.Index:
     names_to_drop = []
@@ -173,7 +175,7 @@ def json_to_df(json_string: str,
         if index_cols and df.columns.intersection(index_cols).size:
             df = df.set_index(index_cols)
     except Exception as e:
-        print(f"Failed to load DataFrame from JSON: {e}")
+        _LOGGER.error(f"Failed to load DataFrame from JSON: {e}")
         raise e
 
     return df
