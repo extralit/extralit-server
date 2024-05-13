@@ -57,8 +57,11 @@ def pandera_dtype_to_python_type(pandera_dtype: Type[pa.typing.Series]) -> Type:
     return Optional[str]
 
 
-def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=False) -> Field:
+def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=False, description_only=True) -> Field:
     description = column.description if column.description else ""
+
+    if description_only:
+        return Field(None, title=column.title, description=description)
 
     if column.checks:
         description += "\nSpecifications:"
@@ -132,7 +135,7 @@ def build_extraction_model(
         lower_class: Optional[str] = None,
         singleton=False,
         validate_assignment=False,
-        ) -> Type[BaseModelForLlamaIndexClsOutput]:
+        description_only=False,) -> Type[BaseModelForLlamaIndexClsOutput]:
     """
     Converts a Pandera DataFrameSchema to a Pydantic model. This model encodes checks and dtypes which will be used as a
     prompt to guide an LLM's JSON output. The function dynamically creates Pydantic models with fields based on the
@@ -154,8 +157,8 @@ def build_extraction_model(
         Type[BaseModelForLlamaIndexClsOutput]: The Pydantic model that represents the schema.
     """
     assert isinstance(schema, pa.DataFrameSchema), f"Expected DataFrameSchema, got {type(schema)}"
-    if top_class is None and not singleton:
-        top_class = schema.name + 's'
+    if top_class is None:
+        top_class = schema.name + ('s' if not singleton else '')
     if lower_class is None:
         lower_class = schema.name
 
@@ -163,7 +166,7 @@ def build_extraction_model(
     columns = {
         field_name: (
             pandera_dtype_to_python_type(column.dtype),
-            pandera_column_to_pydantic_field(column, validate_assignment=validate_assignment)
+            pandera_column_to_pydantic_field(column, validate_assignment=validate_assignment, description_only=description_only)
         )
         for field_name, column in schema.columns.items() \
         if not include_fields or field_name in include_fields
@@ -173,7 +176,7 @@ def build_extraction_model(
     indexes = {
         index.name: (
             pandera_dtype_to_python_type(index.dtype),
-            pandera_column_to_pydantic_field(index, validate_assignment=validate_assignment)
+            pandera_column_to_pydantic_field(index, validate_assignment=validate_assignment, description_only=description_only)
         )
         for index in schema.index.indexes
     } if hasattr(schema.index, 'indexes') else {}

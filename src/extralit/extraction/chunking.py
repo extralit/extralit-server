@@ -13,6 +13,7 @@ from extralit.preprocessing.segment import Segments
 
 INCLUDE_METADATA_KEYS = {'header': True, 'footer': True, 'level': True, 'page_number': True, 'type': True}
 
+
 def create_documents(
         paper: pd.Series,
         preprocessing_path='data/preprocessing/nougat/',

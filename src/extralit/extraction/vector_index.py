@@ -14,6 +14,7 @@ from llama_index.core.storage import StorageContext
 from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.embeddings.openai import OpenAIEmbeddingMode, OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
+from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from weaviate import Client
 
 from extralit.extraction.chunking import create_documents
@@ -21,20 +22,18 @@ from extralit.extraction.query import query_weaviate_db, delete_from_weaviate_db
 from extralit.extraction.storage import get_storage_context
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
+_LOGGER = logging.getLogger(__name__)
 
 
-def create_index(text_documents: List[Document], table_documents: List[Document],
-                 weaviate_client: Optional[Client] = None, index_name: Optional[str] = "LlamaIndexDocumentSections",
-                 persist_dir: Optional[str] = None,
-                 embed_model='text-embedding-3-small', dimensions=1536, retrieval_mode=DEFAULT_RETRIEVAL_MODE,
-                 chunk_size=4096, chunk_overlap=200, verbose=True, ) \
+def create_local_index(text_documents: List[Document], table_documents: List[Document],
+                       persist_dir: Optional[str] = None,
+                       embed_model='text-embedding-3-small', dimensions=1536, retrieval_mode=DEFAULT_RETRIEVAL_MODE,
+                       chunk_size=4096, chunk_overlap=200, verbose=True, ) \
         -> VectorStoreIndex:
-    logging.info(
+    _LOGGER.info(
         f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments, `persist_dir={persist_dir}`")
 
     storage_context = get_storage_context(
-        weaviate_client=weaviate_client,
-        index_name=index_name,
         persist_dir=persist_dir)
 
     embedding_model = OpenAIEmbedding(
@@ -63,17 +62,55 @@ def create_index(text_documents: List[Document], table_documents: List[Document]
     return index
 
 
-def create_or_load_vectorstore_index(paper: pd.Series,
-                                     llm_model="gpt-3.5-turbo",
-                                     embed_model='text-embedding-3-small',
-                                     preprocessing_path='data/preprocessing/nougat/',
-                                     preprocessing_dataset: rg.FeedbackDataset = None,
-                                     reindex=False,
-                                     weaviate_client: Optional[Client] = None,
-                                     index_name: Optional[str] = "LlamaIndexDocumentSections",
-                                     persist_dir='data/interim/vectorstore/',
-                                     **kwargs) \
+def create_vectordb_index(text_documents: List[Document], table_documents: List[Document],
+                          reference: str,
+                          weaviate_client: Client, index_name: Optional[str] = "LlamaIndexDocumentSections",
+                          embed_model='text-embedding-3-small', dimensions=1536, retrieval_mode=DEFAULT_RETRIEVAL_MODE,
+                          overwrite=True,
+                          chunk_size=4096, chunk_overlap=200, verbose=True, ) \
         -> VectorStoreIndex:
+    print(
+        f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate DB, `index_name={index_name}`")
+    if vectordb_has_document(reference, weaviate_client, index_name) and overwrite:
+        docs = query_weaviate_db(
+            weaviate_client, index_name=index_name, filters={'reference': reference},
+            properties=['doc_id', 'reference'],
+            limit=None)
+        delete_from_weaviate_db(weaviate_client, doc_ids=[doc['doc_id'] for doc in docs], index_name=index_name)
+
+    vector_store = WeaviateVectorStore(weaviate_client=weaviate_client, index_name=index_name)
+    embedding_model = OpenAIEmbedding(mode=retrieval_mode, model=embed_model, dimensions=dimensions)
+    embed_model_context = ServiceContext.from_defaults(
+        embed_model=embedding_model,
+        node_parser=SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap),
+    )
+
+    loaded_index = VectorStoreIndex.from_vector_store(vector_store, service_context=embed_model_context)
+    for document in text_documents:
+        loaded_index.insert(document)
+    for document in table_documents:
+        loaded_index.insert(document, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
+
+    if verbose:
+        nodes_counts = Counter([doc.metadata['header'] for doc in loaded_index.docstore.docs.values()])
+        nodes_counts = [(header, count) for header, count in nodes_counts.most_common() if count > 1]
+        print(pd.DataFrame(nodes_counts, columns=['header', 'n_chunks'])) if nodes_counts else None
+
+    return loaded_index
+
+
+def create_or_load_vectorstore_index(
+        paper: pd.Series,
+        llm_model="gpt-3.5-turbo",
+        embed_model='text-embedding-3-small',
+        preprocessing_path='data/preprocessing/nougat/',
+        preprocessing_dataset: rg.FeedbackDataset = None,
+        reindex=False,
+        weaviate_client: Optional[Client] = None,
+        index_name: Optional[str] = "LlamaIndexDocumentSections",
+        persist_dir='data/interim/vectorstore/',
+        **kwargs
+) -> VectorStoreIndex:
     """
     Creates or loads a VectorStoreIndex for a given paper.
 
@@ -96,9 +133,7 @@ def create_or_load_vectorstore_index(paper: pd.Series,
     """
     local_dir = join(persist_dir, paper.name, embed_model)
 
-    use_weaviate = weaviate_client is not None
-    has_document_in_vecstore = vectordb_has_document(paper, weaviate_client, index_name)
-    if reindex or (not exists(local_dir) and not has_document_in_vecstore):
+    if reindex or (not exists(local_dir) and not vectordb_has_document(paper.name, weaviate_client, index_name)):
         assert preprocessing_path is not None or preprocessing_dataset is not None, \
             "Either preprocessing_path or preprocessing_dataset must be given"
         text_documents, table_documents = create_documents(
@@ -110,16 +145,18 @@ def create_or_load_vectorstore_index(paper: pd.Series,
                 name=f"embed-{paper.name}", tags=[paper.name]
             )
 
-        if use_weaviate and has_document_in_vecstore:
-            docs = query_weaviate_db(
-                weaviate_client, index_name=index_name, filters={'reference': paper.name},
-                properties=['doc_id', 'reference'],
-                limit=None)
-            delete_from_weaviate_db(weaviate_client, doc_ids=[doc['doc_id'] for doc in docs], index_name=index_name)
-
-        create_index(
-            text_documents, table_documents, weaviate_client=weaviate_client, index_name=index_name,
-            persist_dir=local_dir, embed_model=embed_model)
+        if weaviate_client is not None:
+            create_vectordb_index(
+                text_documents, table_documents,
+                reference=paper.name,
+                weaviate_client=weaviate_client,
+                index_name=index_name,
+                embed_model=embed_model)
+        else:
+            create_local_index(
+                text_documents, table_documents,
+                persist_dir=local_dir,
+                embed_model=embed_model)
 
     # Load the existing index
     storage_context = get_storage_context(weaviate_client=weaviate_client,

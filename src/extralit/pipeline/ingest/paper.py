@@ -2,6 +2,8 @@ from typing import Dict, Type, List, Literal, Optional
 
 import argilla as rg
 import pandas as pd
+from argilla import FeedbackRecord
+from argilla.client.feedback.schemas.remote.records import RemoteFeedbackRecord
 
 from extralit.convert.json_table import json_to_df, is_json_table
 from extralit.extraction.models.paper import PaperExtraction
@@ -30,7 +32,7 @@ def get_paper_tables(paper: pd.Series,
     Returns:
         Segments: The tables manually annotated for the given paper.
     """
-    records = dataset.filter_by(
+    records: List[FeedbackRecord] = dataset.filter_by(
         metadata_filters=rg.TermsMetadataFilter(
             name='reference',
             values=[paper.name]),
@@ -38,7 +40,6 @@ def get_paper_tables(paper: pd.Series,
 
     segments = Segments()
     for record in records:
-        print(record.id, record.metadata)
         values = get_record_data(record,
                                  fields=['text-1', 'text-2', 'text-3', 'text-4', 'text-5', 'header'],
                                  answers=['text-correction', 'header-correction', 'footer-correction', 'ranking',
@@ -71,7 +72,7 @@ def get_paper_tables(paper: pd.Series,
         type = values.get('number', 'table').split(' ')[0].lower()
         if type == 'figure':
             segment = FigureSegment(
-                id=record.id,
+                id=str(record.id),
                 header=header.strip(),
                 footer=values.get('footer-correction', None),
                 page_number=values.get('page_number', None),
@@ -81,7 +82,7 @@ def get_paper_tables(paper: pd.Series,
             )
         else:
             segment = TableSegment(
-                id=record.id,
+                id=str(record.id),
                 header=header.strip(),
                 footer=values.get('footer-correction', None),
                 page_number=values.get('page_number', None),

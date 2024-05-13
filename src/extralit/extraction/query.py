@@ -1,6 +1,7 @@
 import logging
 from typing import List, Dict, Any, Optional, Union
 
+import pandas as pd
 from llama_index.core.vector_stores import (
     MetadataFilter,
     MetadataFilters,
@@ -83,7 +84,14 @@ def delete_from_weaviate_db(weaviate_client: Client, doc_ids: List[str], index_n
     return len(entries)
 
 
-def vectordb_has_document(paper, weaviate_client, index_name):
+def vectordb_has_document(reference:str, weaviate_client: Client, index_name: str) -> bool:
+    if weaviate_client is None:
+        return False
+
     has_document_in_vecstore = query_weaviate_db(
-        weaviate_client, index_name, filters={'reference': paper.name}, properties=['doc_id', 'reference'], limit=1)
-    return has_document_in_vecstore
+        weaviate_client, index_name,
+        filters={'reference': reference},
+        properties=['doc_id', 'reference'],
+        limit=1)
+
+    return len(has_document_in_vecstore) > 0

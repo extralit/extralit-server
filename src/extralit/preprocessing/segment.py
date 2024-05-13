@@ -20,8 +20,8 @@ CHUNK_DELIM = '\n\n---\n'
 
 
 class Segments(BaseModel):
-    items: List[Union['TextSegment', 'TableSegment', 'FigureSegment']] = Field(default_factory=list,
-                                                                               description="List of segments")
+    items: List[Union['TextSegment', 'TableSegment', 'FigureSegment']] = Field(
+        default_factory=list, description="List of segments")
 
     def get(self, id: str, header: str = None, default=None):
         for item in self.items:
@@ -138,7 +138,7 @@ class Coordinates(BaseModel):
 
 class TextSegment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier of the segment",
-                    alias="doc_id", repr=False)
+                    repr=False)
 
     header: Optional[str] = Field(None, description="Header of the element", example="Abstract")
     text: str = Field(..., description="Content as plain text", repr=False)
