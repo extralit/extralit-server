@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Optional, Union, Dict, List
+from uuid import UUID
 
 import pandas as pd
-from fastapi import FastAPI, Depends, Body, status, HTTPException
+from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
 from fastapi.responses import StreamingResponse
 
 import argilla as rg
@@ -70,12 +71,15 @@ async def completion(
     return StreamingResponse(astreamer(response.response_gen), media_type="text/event-stream")
 
 
-@app.post("/completion/{workspace}", status_code=status.HTTP_201_CREATED,
+@app.post("/completion", status_code=status.HTTP_201_CREATED,
           response_model=ExtractionResponse)
 async def completion(
-        workspace: str,
+        *,
         extraction_request: ExtractionRequest = Body(...),
-        llm_model: str = "gpt-3.5-turbo",
+        workspace: str = Query(...),
+        # user_id: Optional[Union[str, UUID]] = Query(None),
+        username: Optional[Union[str, UUID]] = Query(None),
+        model: str = Query("gpt-4o"),
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
         minio_client=Depends(get_minio_client, use_cache=True),
         global_handler: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_global, use_cache=True),
@@ -86,7 +90,7 @@ async def completion(
     extraction_dfs = {}
     for schema_name, extraction_dict in extraction_request.extractions.items():
         schema = schemas[schema_name]
-        extraction_dfs[schema.name] = pd.DataFrame(extraction_dict)
+        extraction_dfs[schema.name] = json_to_df(extraction_dict, schema=schema)
 
     extractions = PaperExtraction(
         reference=extraction_request.reference,
@@ -97,13 +101,15 @@ async def completion(
     if global_handler is not None and hasattr(global_handler, 'set_trace_params'):
         global_handler.set_trace_params(
             name=f"extract-{extraction_request.reference}",
-            tags=[extraction_request.reference, workspace],
+            user_id=username,
+            session_id=f'{extraction_request.reference}.{extraction_request.schema_name}',
+            tags=[workspace, extraction_request.reference, extraction_request.schema_name],
         )
 
     index = create_or_load_vectorstore_index(
         paper=pd.Series(name=extraction_request.reference),
         weaviate_client=weaviate_client,
-        llm_model=llm_model,
+        llm_model=model,
         embed_model='text-embedding-3-small',
         index_name="LlamaIndexDocumentSections",
     )
