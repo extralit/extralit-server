@@ -95,3 +95,4 @@ def vectordb_has_document(reference:str, weaviate_client: Client, index_name: st
         limit=1)
 
     return len(has_document_in_vecstore) > 0
+

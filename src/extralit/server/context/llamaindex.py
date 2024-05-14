@@ -1,10 +1,10 @@
 import os
 
 from langfuse.llama_index import LlamaIndexCallbackHandler
-from llama_index.core import Settings, set_global_handler, BaseCallbackHandler
+from llama_index.core import Settings, set_global_handler
 
 
-def get_langfuse_global() -> BaseCallbackHandler:
+def get_langfuse_global() -> LlamaIndexCallbackHandler:
     langfuse_callback_handler = LlamaIndexCallbackHandler(
         host=os.getenv('LANGFUSE_HOST'),
         public_key=os.getenv('LANGFUSE_PUBLIC_KEY'),

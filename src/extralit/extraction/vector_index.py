@@ -14,7 +14,7 @@ from llama_index.core.storage import StorageContext
 from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.embeddings.openai import OpenAIEmbeddingMode, OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from llama_index.vector_stores.weaviate import WeaviateVectorStore
+from extralit.extraction.vector_store import WeaviateVectorStore
 from weaviate import Client
 
 from extralit.extraction.chunking import create_documents

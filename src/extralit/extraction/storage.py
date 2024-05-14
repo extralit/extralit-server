@@ -2,7 +2,7 @@ import os
 from typing import Optional
 
 from llama_index.core import StorageContext
-from llama_index.vector_stores.weaviate import WeaviateVectorStore
+from extralit.extraction.vector_store import WeaviateVectorStore
 from llama_index.vector_stores.weaviate.utils import class_schema_exists, NODE_SCHEMA, validate_client
 from weaviate import Client
 

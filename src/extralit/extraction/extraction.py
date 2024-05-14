@@ -12,12 +12,14 @@ from llama_index.core.prompts import default_prompts
 from llama_index.core.vector_stores import (
     MetadataFilter,
     MetadataFilters,
-    FilterOperator, )
+    FilterOperator, FilterCondition, )
 from pydantic.v1 import BaseModel
 
 from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
+from extralit.extraction.prompts import create_extraction_prompt, \
+    create_completion_prompt
 from extralit.extraction.schema import build_extraction_model
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
@@ -58,9 +60,10 @@ def extract_schema(
         index: VectorStoreIndex,
         include_fields: Optional[List[str]] = None,
         headers: Optional[List[str]] = None,
+        types: Optional[List[str]] = None,
         similarity_top_k=20,
         text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL),
-        verbose=None,
+        verbose=True,
         **kwargs,
     ) -> Tuple[pd.DataFrame, ResponseResult]:
     """
@@ -80,41 +83,32 @@ def extract_schema(
     Returns:
         Tuple[pd.DataFrame, ResponseResult]: The extracted DataFrame and the ResponseResult.
     """
-    prompt = f"""
-You are a highly detailed-oriented data extractor with research domain expertise.
-Use Chain-of-Thought to create a mapping of the table fields from the context to the `{schema.name}` schema fields.
-It is not necessary to include "NA" values in the JSON in your response. 
-"""
-    schema_structure = extractions.schemas
-    dep_schemas = schema_structure.upstream_dependencies[schema.name]
-    if dep_schemas:
-        prompt += \
-            f"The `{schema.name}` table to extract should be conditioned on the provided `{', '.join(dep_schemas)}` " \
-            f"entries, however, each combination of references may have multiple `{schema.name}` data entries. " \
-            f"Here are the {dep_schemas} already extracted from the paper:\n\n"
 
-    # Inject prior extraction data into the query
-    for dep_schema in dep_schemas:
-        if dep_schema not in extractions.extractions:
-            raise ValueError(f"Dependency '{dep_schema}' not found in extractions")
+    if schema.name in extractions.extractions:
+        prompt = create_completion_prompt(schema, extractions, include_fields=include_fields)
+    else:
+        prompt = create_extraction_prompt(schema, extractions)
 
-        dep_extraction = filter_unique_columns(extractions[dep_schema])
-        prompt += f"###{dep_schema}###\n`\n{dep_extraction.to_json(orient='index')}\n`\n"
-
-    if verbose:
-        _LOGGER.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
-
-    # Call the call_rag_llm function
     output_cls = build_extraction_model(
         schema, include_fields=include_fields, top_class=schema.name + 's', lower_class=schema.name, validate_assignment=False)
 
     filters = MetadataFilters(
-        filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)]
+        filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)],
+        condition=FilterCondition.AND,
     )
     if headers:
-        filters.filters.append(MetadataFilter(key="header", value=headers, operator=FilterOperator.IN))
+        filters.filters.append(
+            MetadataFilter(key="header", value=headers, operator=FilterOperator.IN)
+        )
+    if types:
+        filters.filters.append(
+            MetadataFilter(key="type", value=types, operator=FilterOperator.IN)
+        )
 
-    print('filters', filters)
+    if verbose > 1:
+        _LOGGER.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
+    elif verbose:
+        _LOGGER.info(f'Filters {filters.__repr__()}')
 
     response = query_index(
         prompt, index=index, output_cls=output_cls,

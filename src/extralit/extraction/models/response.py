@@ -4,7 +4,8 @@ import pandas as pd
 import tiktoken
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import TextNode
-from llama_index.vector_stores.weaviate import WeaviateVectorStore
+from extralit.extraction.vector_store import WeaviateVectorStore
+
 from pydantic.v1 import BaseModel, validator, Field
 from typing_extensions import TypedDict
 

@@ -5,7 +5,7 @@ import pandas as pd
 import pandera as pa
 from pydantic.v1 import BaseModel, Field, create_model
 
-from extralit.extraction.prompts import stringify_to_instructions
+from extralit.extraction.utils import stringify_to_instructions
 from extralit.extraction.staging import heal_json, to_df
 
 
@@ -151,7 +151,10 @@ def build_extraction_model(
         singleton (bool, optional): Whether the schema represents a singleton. Defaults to False.
             When True, the top-level model will not contain a list of lower-level model and only contain a single
             value for each field.
-        validate_assignment: Whether to skip validators in the Pydantic model. Defaults to True.
+        validate_assignment: Whether to enforce validators on the LLM extractions, and potentially raising Exceptions.
+            Defaults to False.
+        description_only: Whether to include only the description in the Pydantic model.
+            Defaults to False.
 
     Returns:
         Type[BaseModelForLlamaIndexClsOutput]: The Pydantic model that represents the schema.
@@ -166,7 +169,8 @@ def build_extraction_model(
     columns = {
         field_name: (
             pandera_dtype_to_python_type(column.dtype),
-            pandera_column_to_pydantic_field(column, validate_assignment=validate_assignment, description_only=description_only)
+            pandera_column_to_pydantic_field(
+                column, validate_assignment=validate_assignment, description_only=description_only)
         )
         for field_name, column in schema.columns.items() \
         if not include_fields or field_name in include_fields
@@ -176,7 +180,8 @@ def build_extraction_model(
     indexes = {
         index.name: (
             pandera_dtype_to_python_type(index.dtype),
-            pandera_column_to_pydantic_field(index, validate_assignment=validate_assignment, description_only=description_only)
+            pandera_column_to_pydantic_field(
+                index, validate_assignment=validate_assignment, description_only=description_only)
         )
         for index in schema.index.indexes
     } if hasattr(schema.index, 'indexes') else {}

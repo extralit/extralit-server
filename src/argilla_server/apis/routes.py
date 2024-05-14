@@ -157,11 +157,9 @@ def create_models_endpoint():
                 r = await client.get(url, params=request.query_params)
             elif request.method == "POST":
                 data = await request.json()
-                print('data', data)
                 r = await client.post(url, json=data)
             elif request.method == "PUT":
                 data = await request.json()
-                print('data', data)
                 r = await client.put(url, data=data)
             elif request.method == "DELETE":
                 r = await client.delete(url, params=request.query_params)

@@ -1,4 +1,5 @@
 import logging
+from typing import Union, List, Dict
 
 import pandas as pd
 import pandera as pa
@@ -35,3 +36,19 @@ def filter_unique_columns(df: pd.DataFrame) -> pd.DataFrame:
         return df.dropna(axis='columns', how='all').loc[:, (df.astype(str).nunique() > 1)]
     else:
         return df
+
+
+def stringify_to_instructions(obj: Union[List, Dict], conjunction='or') -> str:
+    if isinstance(obj, dict):
+        items = list(obj)
+    elif isinstance(obj, list):
+        items = obj
+    else:
+        return obj.__repr__()
+
+    if len(items) > 2:
+        repr_str = ', '.join(str(item) for item in items[:-1]) + f', {conjunction} ' + str(items[-1])
+    else:
+        repr_str = ', '.join(str(item) for item in items)
+
+    return repr_str
