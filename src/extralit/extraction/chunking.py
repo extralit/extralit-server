@@ -12,6 +12,7 @@ from extralit.preprocessing.document import create_or_load_nougat_segments
 from extralit.preprocessing.segment import Segments
 
 INCLUDE_METADATA_KEYS = {'header': True, 'footer': True, 'level': True, 'page_number': True, 'type': True}
+EXCLUDE_LLM_METADATA_KEYS = ['type', 'page_number', 'reference', 'level']
 
 
 def create_documents(
@@ -19,7 +20,7 @@ def create_documents(
         preprocessing_path='data/preprocessing/nougat/',
         preprocessing_dataset: Optional[rg.FeedbackDataset] = None,
         response_status=['submitted'],
-        exclude_llm_metadata_keys=['type', 'page_number', 'reference'],
+        exclude_llm_metadata_keys=EXCLUDE_LLM_METADATA_KEYS,
         **nougat_kwargs) \
         -> Tuple[List[Document], List[Document]]:
     """

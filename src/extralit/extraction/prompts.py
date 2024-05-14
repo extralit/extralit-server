@@ -31,7 +31,7 @@ def create_extraction_prompt(
             (f"The `{schema.name}` table you're extracting should be conditioned on the provided "
              f"`{stringify_to_instructions(dependencies, conjunction='and')}` "
              f"data, however, each combination of references may have multiple `{schema.name}` data entries. "
-             f"Here are the {dependencies} already extracted from the paper:\n\n")
+             f"Here are the data already extracted from the paper:\n\n")
 
     # Inject prior extraction data into the query
     for dep_schema_name in dependencies:
@@ -51,7 +51,7 @@ def create_extraction_prompt(
                    f"Schema:\n"
                    f"{schema_definition}\n"
                    f"Data:\n"
-                   f"`{dep_extraction.to_json(orient='index')}`\n\n")
+                   f"{dep_extraction.to_json(orient='index')}\n\n")
 
     return prompt
 
@@ -67,7 +67,7 @@ def create_completion_prompt(
         f'for the following {len(existing_extraction)} entries.\n'
         f'f"###{schema.name}###\n'
         f"Existing data:\n"
-        f"`{existing_extraction.to_json(orient='index')}`\n\n"
+        f"{existing_extraction.reset_index().to_json(orient='index')}\n\n"
     )
 
     return prompt

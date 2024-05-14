@@ -228,7 +228,7 @@ class FigureSegment(TableSegment):
             return None
 
         openai_mm_llm = OpenAIMultiModal(
-            model="gpt-4-turbo",
+            model="gpt-4o",
             temperature=0.0,
             max_new_tokens=2048,
             image_detail="low",

@@ -8,6 +8,7 @@ import pandas as pd
 import pandera as pa
 
 from extralit.schema.checks.utils import make_same_length_arguments
+from extralit.server.models.extraction import ExtractionResponse
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -134,20 +135,20 @@ def schema_to_json(dataframe_schema: pa.DataFrameSchema) -> Dict[str, Any]:
     return schema_specs
 
 
-def json_to_df(json_string: str,
+def json_to_df(input: Union[str, List[Dict[str, Any]], Dict[str, Dict[str, Any]], ExtractionResponse],
                schema: Optional[pa.DataFrameSchema] = None) -> pd.DataFrame:
     """
     Convert a JSON string to a DataFrame. If a schema is provided, the DataFrame will be validated against the schema.
 
     Args:
-        json_string: JSON string
+        input: JSON string or a list of dictionaries
         schema: DataFrameSchema
         index_level_rename: Dictionary to rename index levels
 
     Returns:
         pd.DataFrame
     """
-    if not json_string:
+    if not input:
         return pd.DataFrame()
 
     if schema is not None:
@@ -158,14 +159,16 @@ def json_to_df(json_string: str,
         required_columns = []
 
     try:
-        try:
-            df = pd.read_json(io.StringIO(json_string) if isinstance(json_string, str) else json_string,
-                              orient='table', convert_dates=False)
-        except:
-            json_string = re.sub(r'"type":"\w+"', '"type":"string"', json_string)
-            json_string = re.sub(r',\s*"extDtype":"[^"]+"', '', json_string)
-            df = pd.read_json(io.StringIO(json_string) if isinstance(json_string, str) else json_string,
-                              orient='table', convert_dates=False)
+        if isinstance(input, str):
+            df = parse_json_to_df(input)
+        elif isinstance(input, list):
+            df = pd.DataFrame(input)
+        elif isinstance(input, dict):
+            df = pd.DataFrame.from_dict(input, orient='index')
+        elif isinstance(input, ExtractionResponse):
+            df = pd.read_json(io.StringIO(json.dumps(input.dict())), orient='table')
+        else:
+            raise ValueError(f"Invalid input type: {type(input)}")
 
         df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
@@ -178,6 +181,18 @@ def json_to_df(json_string: str,
         _LOGGER.error(f"Failed to load DataFrame from JSON: {e}")
         raise e
 
+    return df
+
+
+def parse_json_to_df(input: str) -> pd.DataFrame:
+    try:
+        df = pd.read_json(io.StringIO(input) if isinstance(input, str) else input,
+                          orient='table', convert_dates=False)
+    except:
+        input = re.sub(r'"type":"\w+"', '"type":"string"', input)
+        input = re.sub(r',\s*"extDtype":"[^"]+"', '', input)
+        df = pd.read_json(io.StringIO(input) if isinstance(input, str) else input,
+                          orient='table', convert_dates=False)
     return df
 
 

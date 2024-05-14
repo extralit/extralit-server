@@ -9,7 +9,7 @@ from extralit.extraction.utils import stringify_to_instructions
 from extralit.extraction.staging import heal_json, to_df
 
 
-class BaseModelForLlamaIndexClsOutput(BaseModel):
+class SchemaStructuredOutputResponseModel(BaseModel):
 
     @classmethod
     def parse_raw(cls, b, **kwargs):
@@ -57,8 +57,8 @@ def pandera_dtype_to_python_type(pandera_dtype: Type[pa.typing.Series]) -> Type:
     return Optional[str]
 
 
-def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=False, description_only=True) -> Field:
-    description = column.description if column.description else ""
+def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=False, description_only=False) -> Field:
+    description = column.description or ""
 
     if description_only:
         return Field(None, title=column.title, description=description)
@@ -123,9 +123,11 @@ def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=Fals
         description = description.replace("\nSpecifications:", "")
 
     if not validate_assignment:
-        return Field(None, title=column.title, description=description, json_schema_extra=extra)
+        return Field(None, title=column.title, description=description,
+                     **(dict(json_schema_extra=extra) if extra else {}))
 
-    return Field(None, title=column.title, description=description, **validators, json_schema_extra=extra)
+    return Field(None, title=column.title, description=description, **validators,
+                 **(dict(json_schema_extra=extra) if extra else {}))
 
 
 def build_extraction_model(
@@ -135,7 +137,7 @@ def build_extraction_model(
         lower_class: Optional[str] = None,
         singleton=False,
         validate_assignment=False,
-        description_only=False,) -> Type[BaseModelForLlamaIndexClsOutput]:
+        description_only=False,) -> Type[SchemaStructuredOutputResponseModel]:
     """
     Converts a Pandera DataFrameSchema to a Pydantic model. This model encodes checks and dtypes which will be used as a
     prompt to guide an LLM's JSON output. The function dynamically creates Pydantic models with fields based on the
@@ -157,7 +159,7 @@ def build_extraction_model(
             Defaults to False.
 
     Returns:
-        Type[BaseModelForLlamaIndexClsOutput]: The Pydantic model that represents the schema.
+        Type[SchemaStructuredOutputResponseModel]: The Pydantic model that represents the schema definition and constraints.
     """
     assert isinstance(schema, pa.DataFrameSchema), f"Expected DataFrameSchema, got {type(schema)}"
     if top_class is None:
@@ -177,20 +179,21 @@ def build_extraction_model(
     }
 
     # Add fields from schema.index
+    index_fields = (schema.index.indexes if hasattr(schema.index, 'indexes') else [schema.index])
     indexes = {
         index.name: (
             pandera_dtype_to_python_type(index.dtype),
             pandera_column_to_pydantic_field(
-                index, validate_assignment=validate_assignment, description_only=description_only)
+                index, validate_assignment=validate_assignment)
         )
-        for index in schema.index.indexes
-    } if hasattr(schema.index, 'indexes') else {}
+        for index in index_fields
+    }
 
     if not singleton:
         lower_level_model = create_model(__model_name=lower_class, **indexes, **columns)
         top_level_model = create_model(
             __model_name=top_class,
-            __base__=BaseModelForLlamaIndexClsOutput,
+            __base__=SchemaStructuredOutputResponseModel,
             items=(List[lower_level_model],
                    Field(default_factory=list)),
         )
@@ -198,7 +201,7 @@ def build_extraction_model(
     else:
         top_level_model = create_model(
             __model_name=top_class,
-            __base__=BaseModelForLlamaIndexClsOutput,
+            __base__=SchemaStructuredOutputResponseModel,
             **indexes, **columns
         )
 

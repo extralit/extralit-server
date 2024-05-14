@@ -11,54 +11,11 @@ from bs4 import BeautifulSoup
 from extralit.convert.text import remove_markdown_from_string
 
 
-def fix_llmsherpa_html_table(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    if not soup.table:
-        return html
+def html_table_to_json(s: str) -> str:
+    if not isinstance(s, io.StringIO):
+        s = io.StringIO(s)
 
-    # Ensure <thead> exists. If not, wrap the first <tr> in <thead>
-    if not soup.thead:
-        for th in soup.find_all('th'):
-            if not th.find_parent('thead'):
-                thead = soup.new_tag('thead')
-                th.wrap(thead)
-
-    # Convert <td> to <th> in <thead>
-    if soup.thead:
-        for td in soup.thead.find_all('td'):
-            td.name = 'th'
-
-    # Ensure <tbody> exists for the remaining rows
-    if not soup.tbody and soup.thead:
-        tbody = soup.new_tag('tbody')
-        # Exclude rows already inside <thead>
-        for tr in soup.table.find_all('tr', recursive=False):
-            if tr not in soup.thead:
-                tbody.append(tr)
-        soup.table.append(tbody)
-
-    return str(soup)
-
-
-def llmsherpa_html_to_df(html: io.StringIO):
-    html = fix_llmsherpa_html_table(html)
-    df = pd.read_html(io.StringIO(html) if not isinstance(html, io.StringIO) else html)[0]
-    # df = df.dropna(axis='columns', how='all')
-
-    columns = df.columns.to_frame()
-    columns = columns.fillna('Unnamed')
-    df.columns = pd.MultiIndex.from_frame(columns)
-
-    df.columns = rename_to_unique_columns(df.columns)
-
-    return df
-
-
-def html_table_to_json(html: io.StringIO) -> str:
-    if not isinstance(html, io.StringIO):
-        html = io.StringIO(html)
-
-    df = html_to_df(html, convert_spanning_rows=False)
+    df = html_to_df(s, convert_spanning_rows=False)
     df.columns = df.columns.astype(str).str.replace('.', '')
 
     df_json = df.to_json(orient='table',
@@ -67,10 +24,10 @@ def html_table_to_json(html: io.StringIO) -> str:
 
 
 def html_to_df(
-        s: str,
+        s: Union[io.StringIO, str],
         flatten_columns=True, convert_spanning_rows=False, remove_markdown=False, rename_duplicate_columns=True) \
         -> pd.DataFrame:
-    if isinstance(s, str):
+    if not isinstance(s, io.StringIO):
         s = io.StringIO(s.replace('</p><p>', '<br>'))
 
     df = pd.read_html(s)[0]
@@ -208,3 +165,46 @@ def remove_html_styles(html_str):
     html_str = re.sub(tag_pattern, '', html_str)
 
     return html_str
+
+
+def fix_llmsherpa_html_table(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    if not soup.table:
+        return html
+
+    # Ensure <thead> exists. If not, wrap the first <tr> in <thead>
+    if not soup.thead:
+        for th in soup.find_all('th'):
+            if not th.find_parent('thead'):
+                thead = soup.new_tag('thead')
+                th.wrap(thead)
+
+    # Convert <td> to <th> in <thead>
+    if soup.thead:
+        for td in soup.thead.find_all('td'):
+            td.name = 'th'
+
+    # Ensure <tbody> exists for the remaining rows
+    if not soup.tbody and soup.thead:
+        tbody = soup.new_tag('tbody')
+        # Exclude rows already inside <thead>
+        for tr in soup.table.find_all('tr', recursive=False):
+            if tr not in soup.thead:
+                tbody.append(tr)
+        soup.table.append(tbody)
+
+    return str(soup)
+
+
+def llmsherpa_html_to_df(html: io.StringIO):
+    html = fix_llmsherpa_html_table(html)
+    df = pd.read_html(io.StringIO(html) if not isinstance(html, io.StringIO) else html)[0]
+    # df = df.dropna(axis='columns', how='all')
+
+    columns = df.columns.to_frame()
+    columns = columns.fillna('Unnamed')
+    df.columns = pd.MultiIndex.from_frame(columns)
+
+    df.columns = rename_to_unique_columns(df.columns)
+
+    return df
