@@ -41,11 +41,8 @@ def preprocess(df: pd.DataFrame,
             df.index = df.index.droplevel(list(drop_index_levels))
         df = df.drop(columns=drop_columns, errors='ignore')
 
-    # Drop non-unique index levels
-    if df.shape[0] > 1:
-        single_value_index_levels = drop_single_value_index_names(df).difference(required_columns)
-        if len(single_value_index_levels):
-            df.index = df.index.droplevel(single_value_index_levels)
+    # Drop columns with same name as any index name or multiindex names
+    df = df.drop(columns=df.columns.intersection(df.index.names), errors='ignore')
 
     # Replace values in string columns
     df_str_cols = df.select_dtypes(include=['O', 'string'])
@@ -106,9 +103,15 @@ def df_to_json(df: pd.DataFrame,
         df = df.T
         df.index.name = df.index.name or 'reference'
 
-    df_json = json.loads(
-        df.to_json(orient='table', 
-                   index=bool(df.index.name) or len(df.index.names)>1))
+    try:
+        df_json = json.loads(
+            df.to_json(orient='table',
+                       index=bool(df.index.name) or len(df.index.names)>1))
+    except Exception as e:
+        print('Failed to convert DataFrame to JSON:', e)
+        print(df)
+        raise e
+
     if dataframe_schema is not None:
         df_json['validation'] = schema_to_json(dataframe_schema, )
 

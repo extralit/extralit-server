@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Type, Union
+from typing import List, Optional, Type, Union, Dict, Any
 
 import pandas as pd
 import pandera as pa
@@ -130,9 +130,10 @@ def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=Fals
                  **(dict(json_schema_extra=extra) if extra else {}))
 
 
-def build_extraction_model(
+def get_extraction_schema_model(
         schema: pa.DataFrameSchema,
         include_fields: List[str]=None,
+        exclude_fields: List[str]=None,
         top_class: Optional[str] = None,
         lower_class: Optional[str] = None,
         singleton=False,
@@ -148,6 +149,7 @@ def build_extraction_model(
     Args:
         schema (pa.DataFrameSchema): The Pandera DataFrameSchema to convert.
         include_fields (List[str], optional): A list of column names to include in the Pydantic model. Defaults to None.
+        exclude_fields (List[str], optional): A list of column names to exclude in the Pydantic model. Defaults to None.
         top_class (str, optional): The name of the top-level Pydantic model. Defaults to a plural form of the schema name.
         lower_class (str, optional): The name of the lower-level Pydantic model. Defaults to the schema name.
         singleton (bool, optional): Whether the schema represents a singleton. Defaults to False.
@@ -188,6 +190,9 @@ def build_extraction_model(
         )
         for index in index_fields
     }
+    if exclude_fields:
+        columns = {k: v for k, v in columns.items() if k not in exclude_fields}
+        indexes = {k: v for k, v in indexes.items() if k not in exclude_fields}
 
     if not singleton:
         lower_level_model = create_model(__model_name=lower_class, **indexes, **columns)
@@ -208,3 +213,16 @@ def build_extraction_model(
     top_level_model.__doc__ = clean_docstring(schema.description)
 
     return top_level_model
+
+
+def drop_type_def_from_schema_json(schema_json: Dict[str, Any]) -> Dict[str, Any]:
+
+    for key in schema_json.get('properties', []):
+        schema_json['properties'][key].pop('type', None)
+        schema_json['properties'][key].pop('anyOf', None)
+    for definition in schema_json.get('definitions', {}).values():
+        for key in definition.get('properties', {}):
+            definition['properties'][key].pop('type', None)
+            definition['properties'][key].pop('anyOf', None)
+
+    return schema_json

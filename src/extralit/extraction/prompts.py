@@ -1,10 +1,11 @@
+import json
 from typing import List
 
 import pandera as pa
 from llama_index.core import PromptTemplate
 
 from extralit.extraction.models import PaperExtraction
-from extralit.extraction.schema import build_extraction_model
+from extralit.extraction.schema import get_extraction_schema_model, drop_type_def_from_schema_json
 from extralit.extraction.utils import filter_unique_columns, stringify_to_instructions
 
 FIGURE_TABLE_EXT_PROMPT_TMPL = PromptTemplate(
@@ -43,10 +44,10 @@ def create_extraction_prompt(
         else:
             dep_extraction = extractions[dep_schema_name]
 
-        # prompt += f"###{dep_schema}###\n`\n{dep_extraction.to_json(orient='index')}\n`\n"
-        schema_definition = build_extraction_model(schema_structure[dep_schema_name],
-                                                   include_fields=dep_extraction.columns.tolist(),
-                                                   singleton=True, description_only=True).schema_json()
+        schema_json = get_extraction_schema_model(schema_structure[dep_schema_name],
+                                                  include_fields=dep_extraction.columns.tolist(),
+                                                  singleton=True, description_only=True).schema()
+        schema_definition = json.dumps(drop_type_def_from_schema_json(schema_json))
         prompt += (f"###{dep_schema_name}###\n"
                    f"Schema:\n"
                    f"{schema_definition}\n"

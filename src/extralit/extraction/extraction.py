@@ -3,7 +3,7 @@ import logging
 import os
 import warnings
 from os.path import join, exists
-from typing import Tuple, Dict, Optional, List
+from typing import Tuple, Dict, Optional, List, Union
 
 import pandas as pd
 import pandera as pa
@@ -20,7 +20,7 @@ from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
 from extralit.extraction.prompts import create_extraction_prompt, \
     create_completion_prompt
-from extralit.extraction.schema import build_extraction_model
+from extralit.extraction.schema import get_extraction_schema_model
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
 from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns, filter_unique_columns
@@ -89,8 +89,9 @@ def extract_schema(
     else:
         prompt = create_extraction_prompt(schema, extractions)
 
-    output_cls = build_extraction_model(
-        schema, include_fields=include_fields, top_class=schema.name + 's', lower_class=schema.name, validate_assignment=False)
+    output_cls = get_extraction_schema_model(
+        schema, include_fields=include_fields, exclude_fields=['reference'], top_class=schema.name + 's', lower_class=schema.name,
+        validate_assignment=False)
 
     filters = MetadataFilters(
         filters=[MetadataFilter(key="reference", value=extractions.reference, operator=FilterOperator.EQ)],
@@ -124,8 +125,8 @@ def extract_paper(
         paper: pd.Series,
         schema_structure: SchemaStructure,
         index: VectorStoreIndex = None,
-        llm_models=["gpt-3.5-turbo", 'gpt-4-turbo'],
-        embed_model='text-embedding-ada-002',
+        llm_models: Union[List[str], str]=["gpt-4o", 'gpt-4-turbo'],
+        embed_model:str='text-embedding-ada-002',
         index_kwargs: Dict = None,
         interim_path='data/interim/',
         load_only=False,

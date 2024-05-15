@@ -102,7 +102,7 @@ async def completion(
         global_handler.set_trace_params(
             name=f"extract-{extraction_request.reference}",
             user_id=username,
-            session_id=f'{extraction_request.reference}.{extraction_request.schema_name}',
+            session_id=extraction_request.reference,
             tags=[workspace, extraction_request.reference, extraction_request.schema_name],
         )
 
