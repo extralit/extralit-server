@@ -52,9 +52,3 @@ EXPOSE 6900
 
 # Set the command for the container
 CMD /bin/bash -c "/bin/bash start_argilla_server.sh"
- 
- 
- 
- 
- 
- 
