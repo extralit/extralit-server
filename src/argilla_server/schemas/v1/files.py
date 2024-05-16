@@ -52,7 +52,7 @@ class ObjectMetadata(BaseModel):
             bucket_name=write_result.bucket_name,
             object_name=write_result.object_name,
             last_modified=write_result.last_modified,
-            is_latest=None,
+            is_latest=True,
             etag=write_result.etag,
             size=None,
             content_type=write_result.http_headers.get('Content-Type'),

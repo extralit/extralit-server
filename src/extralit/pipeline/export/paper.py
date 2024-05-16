@@ -53,7 +53,8 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
             ### fields ###
             fields = {
                 'extraction': df_to_json(
-                    extraction, schema, drop_columns=['publication_ref', 'Group'], metadata={'reference': ref}),
+                    extraction, schema, drop_columns=['publication_ref', 'Group'],
+                    metadata={'reference': ref}),
             }
 
             ref_url = f'dataset/{dataset.id}/annotation-mode'

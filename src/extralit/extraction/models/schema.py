@@ -103,7 +103,7 @@ class SchemaStructure(BaseModel):
         visited = {schema.name: 0 for schema in self.schemas}
         stack = deque()
 
-        for schema in self.schemas[::-1]:  # Reverse order to ensure the same order as the input
+        for schema in self.schemas:
             if visited[schema.name] == 0:
                 # If the node is white, visit it
                 topological_sort(schema.name, visited, stack, self.downstream_dependencies)

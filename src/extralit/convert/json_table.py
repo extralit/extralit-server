@@ -70,7 +70,7 @@ def standardize_values(df: pd.DataFrame, schema: pa.DataFrameSchema) -> pd.DataF
     return df
 
 
-def get_required_columns(schema: pa.DataFrameSchema):
+def get_required_columns(schema: pa.DataFrameSchema) -> List[str]:
     required_columns = [name for name, column in schema.columns.items() if not column.nullable]
     index_columns = [index.name for index in schema.index.indexes] if hasattr(schema.index, 'indexes') else []
     required_columns = required_columns + index_columns
@@ -78,26 +78,33 @@ def get_required_columns(schema: pa.DataFrameSchema):
 
 
 def df_to_json(df: pd.DataFrame,
-               schema: Union[pa.DataFrameModel, pa.DataFrameSchema],
+               schema: pa.DataFrameSchema,
                drop_columns=None,
                transpose=False,
                metadata: Optional[Dict[str, Any]] = None,
                **kwargs) -> str:
     """
-    Convert a DataFrame to a JSON string with utils information.
+    Convert a DataFrame to a JSON string. If a schema is provided, the DataFrame will be validated against the schema.
+
+    Args:
+        df: pd.DataFrame
+        schema: DataFrameSchema
+        drop_columns: List of columns to drop
+        transpose: Transpose the DataFrame
+        metadata: Additional metadata to include in the JSON
+
+    Returns:
+        JSON string
     """
-    dataframe_schema = schema if isinstance(schema, pa.DataFrameSchema) else schema.to_schema()
-    required_columns = get_required_columns(dataframe_schema)
+    assert isinstance(schema, pa.DataFrameSchema), 'schema must be a DataFrameSchema'
+    required_columns = get_required_columns(schema)
 
     df = preprocess(df, required_columns=required_columns, drop_columns=drop_columns)
 
     try:
-        df = standardize_values(df, dataframe_schema)
+        df = standardize_values(df, schema)
     except Exception as e:
         print('Failed to standardize values:', e)
-
-    # if df.columns.size == 0 or df.shape[0] == 0:
-    #     return 'NA'
 
     if transpose:
         df = df.T
@@ -112,8 +119,8 @@ def df_to_json(df: pd.DataFrame,
         print(df)
         raise e
 
-    if dataframe_schema is not None:
-        df_json['validation'] = schema_to_json(dataframe_schema, )
+    if schema is not None:
+        df_json['schema']['schemaName'] = schema.name
 
     if metadata:
         df_json = {**metadata, **df_json}

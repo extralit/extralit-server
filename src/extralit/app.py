@@ -133,7 +133,7 @@ async def completion(
         if df.empty:
             if rag_response.source_nodes is None or len(rag_response.source_nodes) == 0:
                 raise HTTPException(status_code=404,
-                                    detail='There were context provided to the LLM. Please modify your filters.')
+                                    detail='There were no context selected due to stringent filters. Please modify your filters.')
             raise HTTPException(status_code=404, detail='No entities found in the extraction')
 
         response = ExtractionResponse.parse_raw(df.to_json(orient='table'))
