@@ -11,8 +11,11 @@ def convert_response_to_dataframe(response: Response) -> pd.DataFrame:
     try:
         df: pd.DataFrame = response.response.to_df()
     except AttributeError as ae:
-        _LOGGER.error(f"Failed to convert response to DataFrame: {ae}\n"
-                      f"Response: {response.response}")
+        _LOGGER.error(
+            f"""Failed to convert response to DataFrame: {ae}
+            Response: {response.response}
+            Source nodes: {len(response.source_nodes)}
+            """)
         df = pd.DataFrame()
     return df
 

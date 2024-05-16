@@ -123,10 +123,11 @@ class FileObjectResponse(BaseModel):
         
         headers = {
             "Content-Type": str(self.metadata.content_type) if self.metadata.content_type else "",
-            "X-Version-Id": str(self.metadata.version_id) if self.metadata.version_id else "",
-            "X-Last-Modified": self.metadata.last_modified.strftime('%Y-%m-%dT%H:%M:%S') if self.metadata.last_modified else "",
-            "X-Is-Latest": str(self.metadata.is_latest).lower() if self.metadata.is_latest is not None else "",
-            "X-Version-Tag": self.version_tag,
+            "ETag": str(self.metadata.etag) if self.metadata.etag else "",
+            "Version-Id": str(self.metadata.version_id) if self.metadata.version_id else "",
+            "Last-Modified": self.metadata.last_modified.strftime('%Y-%m-%dT%H:%M:%S') if self.metadata.last_modified else "",
+            "Is-Latest": str(self.metadata.is_latest).lower() if self.metadata.is_latest is not None else "",
+            "Version-Tag": self.version_tag,
         }
         return headers
 

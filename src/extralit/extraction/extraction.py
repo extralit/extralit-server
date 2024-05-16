@@ -118,7 +118,13 @@ def extract_schema(
 
     df = convert_response_to_dataframe(response)
     df = generate_reference_columns(df, schema)
-    return df, ResponseResult(**response.__dict__)
+    try:
+        response = ResponseResult(**response.__dict__)
+    except Exception as e:
+        _LOGGER.error(f"Failed to create ResponseResult: {e}")
+        response = ResponseResult()
+
+    return df, response
 
 
 def extract_paper(

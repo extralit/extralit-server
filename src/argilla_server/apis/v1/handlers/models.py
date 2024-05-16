@@ -42,5 +42,6 @@ async def proxy(request: Request, rest_of_path: str,
         async for chunk in r.aiter_bytes():
             yield chunk
 
-    return StreamingResponse(content_generator(), media_type=r.headers.get('content-type'))
+    return StreamingResponse(content_generator(), status_code=r.status_code, 
+                             headers=r.headers, media_type=r.headers.get('content-type'))
 

@@ -28,11 +28,11 @@ def create_extraction_prompt(
     schema_structure = extractions.schemas
     dependencies = schema_structure.upstream_dependencies[schema.name]
     if dependencies:
-        prompt += \
-            (f"The `{schema.name}` table you're extracting should be conditioned on the provided "
-             f"`{stringify_to_instructions(dependencies, conjunction='and')}` "
-             f"data, however, each combination of references may have multiple `{schema.name}` data entries. "
-             f"Here are the data already extracted from the paper:\n\n")
+        prompt += (
+            f"The `{schema.name}` table you're extracting should be conditioned on the provided "
+            f"`{stringify_to_instructions(dependencies, conjunction='and')}` "
+            f"data, however, each combination of references may have multiple `{schema.name}` data entries. "
+            f"Here are the data already extracted from the paper:\n\n")
 
     # Inject prior extraction data into the query
     for dep_schema_name in dependencies:
@@ -48,11 +48,12 @@ def create_extraction_prompt(
                                                   include_fields=dep_extraction.columns.tolist(),
                                                   singleton=True, description_only=True).schema()
         schema_definition = json.dumps(drop_type_def_from_schema_json(schema_json))
-        prompt += (f"###{dep_schema_name}###\n"
-                   f"Schema:\n"
-                   f"{schema_definition}\n"
-                   f"Data:\n"
-                   f"{dep_extraction.to_json(orient='index')}\n\n")
+        prompt += (
+            f"###{dep_schema_name}###\n"
+            f"Schema:\n"
+            f"{schema_definition}\n"
+            f"Data:\n"
+            f"{dep_extraction.to_json(orient='index')}\n\n")
 
     return prompt
 
@@ -64,10 +65,10 @@ def create_completion_prompt(
     existing_extraction = extractions[schema.name]
 
     prompt += (
-        f'Please complete the extraction for the `{schema.name}` schema by filling in the {include_fields} fields '
+        f'Please complete the following `{schema.name}` table by extracting the {include_fields} fields '
         f'for the following {len(existing_extraction)} entries.\n'
         f'f"###{schema.name}###\n'
-        f"Existing data:\n"
+        f"Data:\n"
         f"{existing_extraction.reset_index().to_json(orient='index')}\n\n"
     )
 

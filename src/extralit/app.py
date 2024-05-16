@@ -77,55 +77,67 @@ async def completion(
         *,
         extraction_request: ExtractionRequest = Body(...),
         workspace: str = Query(...),
-        # user_id: Optional[Union[str, UUID]] = None,
         username: Optional[Union[str, UUID]] = None,
         model: str = "gpt-4o",
+        similarity_top_k=3,
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
         minio_client=Depends(get_minio_client, use_cache=True),
         global_handler: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_global, use_cache=True),
 ):
-    schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
-    schema = schemas[extraction_request.schema_name]
+    try:
+        schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
+        schema = schemas[extraction_request.schema_name]
 
-    extraction_dfs = {}
-    for schema_name, extraction_dict in extraction_request.extractions.items():
-        schema = schemas[schema_name]
-        extraction_dfs[schema.name] = json_to_df(extraction_dict, schema=schema)
+        extraction_dfs = {}
+        for schema_name, extraction_dict in extraction_request.extractions.items():
+            schema = schemas[schema_name]
+            extraction_dfs[schema.name] = json_to_df(extraction_dict, schema=schema)
 
-    extractions = PaperExtraction(
-        reference=extraction_request.reference,
-        extractions=extraction_dfs,
-        schemas=schemas)
+        extractions = PaperExtraction(
+            reference=extraction_request.reference,
+            extractions=extraction_dfs,
+            schemas=schemas)
 
-    ### Create or load the index ###
-    if global_handler is not None and hasattr(global_handler, 'set_trace_params'):
-        global_handler.set_trace_params(
-            name=f"extract-{extraction_request.reference}",
-            user_id=username,
-            session_id=extraction_request.reference,
-            tags=[workspace, extraction_request.reference, extraction_request.schema_name],
+        ### Create or load the index ###
+        if global_handler is not None and hasattr(global_handler, 'set_trace_params'):
+            global_handler.set_trace_params(
+                name=f"extract-{extraction_request.reference}",
+                user_id=username,
+                session_id=extraction_request.reference,
+                tags=[workspace, extraction_request.reference, extraction_request.schema_name],
+            )
+
+        index = create_or_load_vectorstore_index(
+            paper=pd.Series(name=extraction_request.reference),
+            weaviate_client=weaviate_client,
+            llm_model=model,
+            embed_model='text-embedding-3-small',
+            index_name="LlamaIndexDocumentSections",
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to create an extraction request: {e}')
 
-    index = create_or_load_vectorstore_index(
-        paper=pd.Series(name=extraction_request.reference),
-        weaviate_client=weaviate_client,
-        llm_model=model,
-        embed_model='text-embedding-3-small',
-        index_name="LlamaIndexDocumentSections",
-    )
-
-    ### Extract entities ###
-    df, _ = extract_schema(
-        schema=schema, extractions=extractions, index=index, schema_structure=schemas,
-        include_fields=extraction_request.columns,
-        headers=extraction_request.headers,
-        types=extraction_request.types,
-        verbose=1, )
+    if extraction_request.headers and len(extraction_request.headers) > similarity_top_k:
+        similarity_top_k = len(extraction_request.headers)
 
     try:
+        ### Extract entities ###
+        df, rag_response = extract_schema(
+            schema=schema, extractions=extractions, index=index, schema_structure=schemas,
+            similarity_top_k=similarity_top_k,
+            include_fields=extraction_request.columns,
+            headers=extraction_request.headers,
+            types=extraction_request.types,
+            verbose=1, )
+
+        if df.empty:
+            if rag_response.source_nodes is None or len(rag_response.source_nodes) == 0:
+                raise HTTPException(status_code=404,
+                                    detail='There were context provided to the LLM. Please modify your filters.')
+            raise HTTPException(status_code=404, detail='No entities found in the extraction')
+
         response = ExtractionResponse.parse_raw(df.to_json(orient='table'))
     except Exception as e:
-        print(e, '\n', df.to_json(orient='table'))
         raise HTTPException(status_code=500, detail=str(e))
 
     return response

@@ -26,9 +26,9 @@ class SourceNode(TypedDict):
 
 
 class ResponseResult(BaseModel):
-    response: BaseModelForLlamaIndexResponse
-    source_nodes: List[SourceNode]
-    metadata: Dict[str, Dict[str, Any]]
+    response: Optional[BaseModelForLlamaIndexResponse]
+    source_nodes: Optional[List[SourceNode]]
+    metadata: Optional[Dict[str, Dict[str, Any]]]
 
     @validator('source_nodes', pre=True)
     def parse_source_nodes(cls, v):
