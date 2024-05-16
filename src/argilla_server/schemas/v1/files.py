@@ -38,7 +38,7 @@ class ObjectMetadata(BaseModel):
             bucket_name=minio_object.bucket_name,
             object_name=minio_object.object_name,
             last_modified=minio_object.last_modified,
-            is_latest=minio_object.is_latest != 'false',
+            is_latest=None if minio_object.is_latest is None else minio_object.is_latest.lower() == 'true',
             etag=minio_object.etag,
             size=minio_object.size,
             content_type=minio_object.content_type,
@@ -91,6 +91,8 @@ class ListObjectsResponse(BaseModel):
 
             for i, obj in enumerate(sorted_objects):
                 obj.version_tag = f"v{i + 1}"
+                if obj.is_latest is None:
+                    obj.is_latest = (i == len(sorted_objects) - 1)
 
         # Flatten the list of objects
         objects = [obj for object_list in grouped_objects.values() for obj in object_list]
@@ -115,6 +117,16 @@ class FileObjectResponse(BaseModel):
                 if version.version_id == self.metadata.version_id:
                     return version.version_tag
         return ''
+    
+    @property
+    def is_latest(self) -> Optional[bool]:
+        if not self.metadata or not self.versions:
+            return None
+        else:
+            for version in self.versions:
+                if version.version_id == self.metadata.version_id:
+                    return version.is_latest
+        return None
 
     @property
     def http_headers(self) -> Dict[str, str]:
@@ -125,10 +137,11 @@ class FileObjectResponse(BaseModel):
             "Content-Type": str(self.metadata.content_type) if self.metadata.content_type else "",
             "ETag": str(self.metadata.etag) if self.metadata.etag else "",
             "Version-Id": str(self.metadata.version_id) if self.metadata.version_id else "",
-            "Last-Modified": self.metadata.last_modified.strftime('%Y-%m-%dT%H:%M:%S') if self.metadata.last_modified else "",
-            "Is-Latest": str(self.metadata.is_latest).lower() if self.metadata.is_latest is not None else "",
+            "Last-Modified": self.metadata.last_modified.strftime('%Y-%m-%dT%H:%M:%SZ') if self.metadata.last_modified else "",
+            "Is-Latest": str(self.is_latest).lower() if self.is_latest is not None else "",
             "Version-Tag": self.version_tag,
         }
+        headers = {key: value for key, value in headers.items() if value}
         return headers
 
     @validator('response')

@@ -25,10 +25,12 @@ async def get_file(
     ):
 
     # Check if the current user is in the workspace to have access to the s3 bucket of the same name
-    # await authorize(current_user, FilePolicy.get(bucket))
+    # if current_user is not None:
+    #     await authorize(current_user, FilePolicy.get(bucket))
 
     try:
         file_response = files.get_object(client, bucket, object, version_id=version_id, include_versions=True)
+        print(file_response.metadata)
 
         return StreamingResponse(
             file_response.response, 

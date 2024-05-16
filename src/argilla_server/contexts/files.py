@@ -57,13 +57,14 @@ def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str
                include_versions=False) -> FileObjectResponse:
     try:
         stat = client.stat_object(bucket, object, version_id=version_id)
-        response = client.get_object(bucket, object, version_id=stat.version_id)
+        obj = client.get_object(bucket, object, version_id=stat.version_id)
 
         if include_versions:
-            versions = list_objects(client, bucket, prefix=object, include_version=True)
-            return FileObjectResponse(response=response, metadata=stat, versions=versions)
+            versions = list_objects(client, bucket, prefix=object, include_version=include_versions)
+        else:
+            versions = None
 
-        return FileObjectResponse(response=response, metadata=stat)
+        return FileObjectResponse(response=obj, metadata=stat, versions=versions)
     
     except S3Error as se:
         _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}", stack_info=True)
