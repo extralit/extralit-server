@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Union, Dict, List
 from uuid import UUID
 
@@ -21,6 +22,7 @@ from extralit.server.context.datasets import get_argilla_dataset
 from extralit.server.models.extraction import ExtractionRequest, ExtractionResponse
 from extralit.server.utils import astreamer
 
+_LOGGER = logging.getLogger(__name__)
 app = FastAPI()
 
 
@@ -115,6 +117,7 @@ async def completion(
             index_name="LlamaIndexDocumentSections",
         )
     except Exception as e:
+        _LOGGER.error(f"Failed to create or load the index: {e}")
         raise HTTPException(status_code=500, detail=f'Failed to create an extraction request: {e}')
 
     if extraction_request.headers and len(extraction_request.headers) > similarity_top_k:
@@ -128,13 +131,17 @@ async def completion(
             include_fields=extraction_request.columns,
             headers=extraction_request.headers,
             types=extraction_request.types,
+            extra_prompt=extraction_request.prompt,
             verbose=1, )
 
         if df.empty:
             if rag_response.source_nodes is None or len(rag_response.source_nodes) == 0:
-                raise HTTPException(status_code=404,
-                                    detail='There were no context selected due to stringent filters. Please modify your filters.')
-            raise HTTPException(status_code=404, detail='No entities found in the extraction')
+                raise HTTPException(
+                    status_code=404,
+                    detail=f'There were no context selected due to stringent filters. Please modify your <br>'
+                           f'filters: {dict(headers=extraction_request.headers, types=extraction_request.types)}')
+            raise HTTPException(status_code=404,
+                                detail="No extraction found with the selected context and your query.")
 
         response = ExtractionResponse.parse_raw(df.to_json(orient='table'))
     except Exception as e:

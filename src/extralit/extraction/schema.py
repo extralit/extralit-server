@@ -5,7 +5,7 @@ import pandas as pd
 import pandera as pa
 from pydantic.v1 import BaseModel, Field, create_model
 
-from extralit.extraction.utils import stringify_to_instructions
+from extralit.extraction.utils import stringify_lists
 from extralit.extraction.staging import heal_json, to_df
 
 
@@ -107,10 +107,10 @@ def pandera_column_to_pydantic_field(column: pa.Column, validate_assignment=Fals
             # description += f"\nSuggestion: {stringify_to_instructions(check.statistics['values'])}"
             extra['suggestion'] = check.statistics['values']
         elif 'isin' == check.name:
-            description += f"\nAllowed values: {stringify_to_instructions(check.statistics['allowed_values'])}"
+            description += f"\nAllowed values: {stringify_lists(check.statistics['allowed_values'])}"
             extra['allowed_values'] = check.statistics['allowed_values']
         elif 'notin' == check.name:
-            description += f"\nForbidden values: {stringify_to_instructions(check.statistics['forbidden_values'])}"
+            description += f"\nForbidden values: {stringify_lists(check.statistics['forbidden_values'])}"
             extra['forbidden_values'] = check.statistics['forbidden_values']
 
         elif check.name == "multiselect":
@@ -179,6 +179,9 @@ def get_extraction_schema_model(
         for field_name, column in schema.columns.items() \
         if not include_fields or field_name in include_fields
     }
+    for field_name in include_fields or []:
+        if field_name not in columns:
+            columns[field_name] = (Optional[str], Field(None, title=field_name))
 
     # Add fields from schema.index
     index_fields = (schema.index.indexes if hasattr(schema.index, 'indexes') else [schema.index])

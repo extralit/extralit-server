@@ -41,7 +41,7 @@ def filter_unique_columns(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
-def stringify_to_instructions(obj: Union[List, Dict], conjunction='or') -> str:
+def stringify_lists(obj: Union[List, Dict], conjunction='or') -> str:
     if isinstance(obj, dict):
         items = list(obj)
     elif isinstance(obj, list):

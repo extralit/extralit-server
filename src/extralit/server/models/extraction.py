@@ -20,7 +20,7 @@ class ExtractionRequest(BaseModel):
     columns: list[str] | None = None
     headers: list[str] | None = None
     types: list[str] | None = None
-    workspace: str | None = None
+    prompt: str | None = None
 
 
 class FieldSchema(BaseModel):

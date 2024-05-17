@@ -1,12 +1,12 @@
 import json
-from typing import List
+from typing import List, Optional
 
 import pandera as pa
 from llama_index.core import PromptTemplate
 
 from extralit.extraction.models import PaperExtraction
 from extralit.extraction.schema import get_extraction_schema_model, drop_type_def_from_schema_json
-from extralit.extraction.utils import filter_unique_columns, stringify_to_instructions
+from extralit.extraction.utils import filter_unique_columns, stringify_lists
 
 FIGURE_TABLE_EXT_PROMPT_TMPL = PromptTemplate(
     """Given the figure from a research paper, please extract only the variables and observations names of the figure/chart as columns header and rows index in an HTML table, but do not extract any numerical data values.
@@ -30,7 +30,7 @@ def create_extraction_prompt(
     if dependencies:
         prompt += (
             f"The `{schema.name}` table you're extracting should be conditioned on the provided "
-            f"`{stringify_to_instructions(dependencies, conjunction='and')}` "
+            f"`{stringify_lists(dependencies, conjunction='and')}` "
             f"data, however, each combination of references may have multiple `{schema.name}` data entries. "
             f"Here are the data already extracted from the paper:\n\n")
 
@@ -59,14 +59,18 @@ def create_extraction_prompt(
 
 
 def create_completion_prompt(
-        schema: pa.DataFrameSchema, extractions: PaperExtraction, include_fields: List[str], filter_unique_cols=True) -> str:
+        schema: pa.DataFrameSchema, extractions: PaperExtraction, include_fields: List[str],
+        filter_unique_cols=True, extra_prompt: Optional[str]=None, ) -> str:
     assert schema.name in extractions.extractions, f"Schema '{schema.name}' not found in extractions"
     prompt = create_extraction_prompt(schema, extractions, filter_unique_cols)
     existing_extraction = extractions[schema.name]
 
+    note = f'Note: {extra_prompt}\n' if extra_prompt is not None else ''
+
     prompt += (
         f'Please complete the following `{schema.name}` table by extracting the {include_fields} fields '
         f'for the following {len(existing_extraction)} entries.\n'
+        f'{note}'
         f'f"###{schema.name}###\n'
         f"Data:\n"
         f"{existing_extraction.reset_index().to_json(orient='index')}\n\n"

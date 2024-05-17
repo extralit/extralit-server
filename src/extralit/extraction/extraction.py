@@ -28,7 +28,7 @@ from extralit.extraction.utils import convert_response_to_dataframe, generate_re
 _LOGGER = logging.getLogger(__name__)
 
 
-def query_index(
+def query_rag_index(
         prompt: str,
         index: VectorStoreIndex,
         output_cls=BaseModel,
@@ -63,6 +63,7 @@ def extract_schema(
         types: Optional[List[str]] = None,
         similarity_top_k=20,
         text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL),
+        extra_prompt: Optional[str] = None,
         verbose=True,
         **kwargs,
     ) -> Tuple[pd.DataFrame, ResponseResult]:
@@ -85,9 +86,9 @@ def extract_schema(
     """
 
     if schema.name in extractions.extractions:
-        prompt = create_completion_prompt(schema, extractions, include_fields=include_fields)
+        prompt = create_completion_prompt(schema, extractions, include_fields=include_fields, extra_prompt=extra_prompt)
     else:
-        prompt = create_extraction_prompt(schema, extractions)
+        prompt = create_extraction_prompt(schema, extractions, )
 
     output_cls = get_extraction_schema_model(
         schema, include_fields=include_fields, exclude_fields=['reference'], top_class=schema.name + 's', lower_class=schema.name,
@@ -111,7 +112,7 @@ def extract_schema(
     elif verbose:
         _LOGGER.info(f'Filters {filters.__repr__()}')
 
-    response = query_index(
+    response = query_rag_index(
         prompt, index=index, output_cls=output_cls,
         similarity_top_k=similarity_top_k, filters=filters,
         text_qa_template=text_qa_template, response_mode="compact", **kwargs)
