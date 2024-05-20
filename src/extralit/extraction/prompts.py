@@ -23,8 +23,8 @@ def create_extraction_prompt(
         f"Your task is to extract data from a malaria research paper.\n"
         f"When given tables from the paper, use Chain-of-Thought to create a mapping of the table's columns to the "
         f"`{schema.name}` schema fields.\n"
-        f"If you don't find the information in the text or tables or you are not sure, "
-        f"omit the key-value in your JSON response.")
+        f"If you don't find the information in the given context or you are not sure, "
+        f"omit the key-value in your JSON response. ")
     schema_structure = extractions.schemas
     dependencies = schema_structure.upstream_dependencies[schema.name]
     if dependencies:
