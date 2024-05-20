@@ -101,15 +101,16 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
                           field='extraction', answer='extraction-correction',
                           user: Optional[rg.User] = None, ) -> PaperExtraction:
 
+    reference = paper.name
     records = dataset.filter_by(
         metadata_filters=rg.TermsMetadataFilter(
             name='reference',
-            values=[paper.name])).records
+            values=[reference])).records
 
     extractions = {}
     durations = {}
     for record in records:
-        if record.metadata['reference'] != paper.name:
+        if record.metadata['reference'] != reference:
             continue
 
         outputs = get_record_data(record,
@@ -123,12 +124,10 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
         else:
             table_json = None
 
-        duration = outputs.get('duration', None)
-
         for schema in schemas.schemas:
             if schema.name == record.metadata['type']:
                 extractions[schema.name] = json_to_df(table_json, schema=schema)
-                durations[schema.name] = duration
+                durations[schema.name] = outputs.get('duration', None)
 
-    return PaperExtraction(extractions=extractions, schemas=schemas, durations=durations)
+    return PaperExtraction(extractions=extractions, schemas=schemas, durations=durations, reference=reference)
 

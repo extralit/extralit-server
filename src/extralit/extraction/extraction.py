@@ -139,13 +139,14 @@ def extract_paper(
         load_only=False,
         verbose: int = 0,
 ) -> Tuple[PaperExtraction, ResponseResults]:
+
     reference = paper.name
     if isinstance(llm_models, str):
         llm_models = [llm_models]
 
     ### Load interim results ###
     interim_save_dir = join(interim_path, llm_models[0], reference)
-    if load_only:
+    if load_only and exists(interim_save_dir):
         if not exists(interim_save_dir):
             raise FileNotFoundError(f"Interim save directory does not exist: {interim_save_dir}")
         with open(join(interim_save_dir, 'responses.json'), 'r') as file:
@@ -154,6 +155,7 @@ def extract_paper(
         extractions = PaperExtraction(
             extractions={k: v.response.to_df() for k, v in responses.items.items()},
             schemas=schema_structure,
+            reference=reference
         )
         return extractions, responses
 

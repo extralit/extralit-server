@@ -23,7 +23,7 @@ def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
 
     if users:
         user_ids = [u.id for u in users]
-        responses = [r for r in responses if not users or r.user_id in user_ids]
+        responses = [r for r in responses if r.user_id in user_ids]
 
     if skip_status and any(r.status in skip_status for r in responses):
         return {}

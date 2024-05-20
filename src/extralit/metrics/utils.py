@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from natsort import index_natsorted
 
+_LOGGER = logging.getLogger(__name__)
 
 def harmonize_columns(true_df: pd.DataFrame, pred_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -33,6 +34,15 @@ def harmonize_columns(true_df: pd.DataFrame, pred_df: pd.DataFrame) -> Tuple[pd.
     return true_df, pred_df
 
 
+def is_numeric_dtype(series: pd.Series) -> bool:
+    return np.issubdtype(series.dtype, np.number)
+
+
+def natural_sort_key_generator(s: pd.Series) -> np.ndarray:
+    fill_value = -999999 if is_numeric_dtype(s) else 'zzz'
+    return np.argsort(index_natsorted(s.fillna(fill_value)))
+
+
 def reorder_rows(true_df: pd.DataFrame, pred_df: pd.DataFrame, index_columns: List[str] = None, verbose=False) \
         -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -55,11 +65,11 @@ def reorder_rows(true_df: pd.DataFrame, pred_df: pd.DataFrame, index_columns: Li
         sort_columns.extend(common_columns)
 
     if sort_columns:
-        true_df = true_df.sort_values(by=sort_columns, key=lambda x: np.argsort(index_natsorted(x)))
-        pred_df = pred_df.sort_values(by=sort_columns, key=lambda x: np.argsort(index_natsorted(x)))
+        true_df = true_df.sort_values(by=sort_columns, key=natural_sort_key_generator)
+        pred_df = pred_df.sort_values(by=sort_columns, key=natural_sort_key_generator)
 
     if verbose:
-        print('sort_columns', sort_columns)
+        _LOGGER.info(f'sort_columns: {sort_columns}')
 
     return true_df, pred_df
 
@@ -86,7 +96,7 @@ def most_similar_columns(pred_df: pd.DataFrame, true_df: pd.DataFrame) -> List[s
     # If dtypes of intersecting columns are different, give warning
     for col in intersecting_columns:
         if true_df[col].dtype != pred_df[col].dtype:
-            logging.warning(f"Column {col} has different dtypes: {true_df[col].dtype} and {pred_df[col].dtype}")
+            _LOGGER.warning(f"\nColumn {col} has different dtypes: {true_df[col].dtype} and {pred_df[col].dtype}")
 
     if not intersecting_columns:
         return []

@@ -30,7 +30,6 @@ async def get_file(
 
     try:
         file_response = files.get_object(client, bucket, object, version_id=version_id, include_versions=True)
-        print(file_response.metadata)
 
         return StreamingResponse(
             file_response.response, 
