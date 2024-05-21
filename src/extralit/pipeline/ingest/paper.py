@@ -98,17 +98,20 @@ def get_paper_tables(paper: pd.Series,
 
 def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
                           schemas: SchemaStructure,
-                          field='extraction', answer='extraction-correction',
+                          field: str,
+                          answer: str,
+                          suggestion: Optional[str]=None,
                           user: Optional[rg.User] = None, ) -> PaperExtraction:
 
     reference = paper.name
-    records = dataset.filter_by(
+    records: List[RemoteFeedbackRecord] = dataset.filter_by(
         metadata_filters=rg.TermsMetadataFilter(
             name='reference',
             values=[reference])).records
 
     extractions = {}
     durations = {}
+    updated_at = {}
     for record in records:
         if record.metadata['reference'] != reference:
             continue
@@ -116,8 +119,12 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
         outputs = get_record_data(record,
                                   fields=field,
                                   answers=[answer, 'duration'] if answer else ['duration'],
+                                  suggestions=[suggestion] if suggestion else [],
                                   users=user)
-        if answer in outputs and is_json_table(outputs[answer]):
+
+        if suggestion in outputs:
+            table_json = outputs[suggestion]
+        elif answer in outputs and is_json_table(outputs[answer]):
             table_json = outputs[answer]
         elif field in outputs and is_json_table(outputs[field]):
             table_json = outputs[field]
@@ -129,5 +136,8 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
                 extractions[schema.name] = json_to_df(table_json, schema=schema)
                 durations[schema.name] = outputs.get('duration', None)
 
-    return PaperExtraction(extractions=extractions, schemas=schemas, durations=durations, reference=reference)
+            updated_at[schema.name] = record.inserted_at
+
+    return PaperExtraction(reference=reference, extractions=extractions, schemas=schemas,
+                           durations=durations, updated_at=updated_at)
 

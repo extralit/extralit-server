@@ -14,5 +14,4 @@ def get_langfuse_global() -> LlamaIndexCallbackHandler:
         Settings.callback_manager.add_handler(langfuse_callback_handler)
     set_global_handler("langfuse")
 
-    from llama_index.core import global_handler
-    return global_handler
+    return langfuse_callback_handler

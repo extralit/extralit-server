@@ -65,7 +65,7 @@ def create_completion_prompt(
     prompt = create_extraction_prompt(schema, extractions, filter_unique_cols)
     existing_extraction = extractions[schema.name]
 
-    note = f'Note: {extra_prompt}\n' if extra_prompt is not None else ''
+    note = f'Note: {extra_prompt}\n' if extra_prompt else ''
 
     prompt += (
         f'Please complete the following `{schema.name}` table by extracting the {include_fields} fields '

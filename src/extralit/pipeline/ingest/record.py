@@ -1,25 +1,30 @@
 from datetime import datetime
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Any
 
 import argilla as rg
 from argilla.client.feedback.schemas.remote.records import RemoteFeedbackRecord
 from argilla.client.sdk.users.models import UserModel
 
 from extralit.convert.json_table import is_json_table
+from extralit.pipeline.update.suggestion import get_record_suggestion_value
 
 
 def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
                     fields: Union[List[str], str],
                     answers: Optional[Union[List[str], str]] = None,
+                    suggestions: Optional[Union[List[str], str]] = None,
                     metadatas: Optional[Union[List[str], str]] = None,
                     users: Optional[Union[List[rg.User], rg.User]] = None,
                     skip_status: Optional[List[str]] = ["discarded"]) \
-        -> Dict[str, str]:
-    answers = [answers] if isinstance(answers, str) else set(answers) if answers else []
+        -> Dict[str, Any]:
     fields = [fields] if isinstance(fields, str) else set(fields) if fields else []
+    answers = [answers] if isinstance(answers, str) else set(answers) if answers else []
+    suggestions = [suggestions] if isinstance(suggestions, str) else set(suggestions) if suggestions else []
     metadatas = [metadatas] if isinstance(metadatas, str) else set(metadatas) if metadatas else []
     users = [users] if isinstance(users, (UserModel, rg.User)) else list(users) if users else []
     responses = record.responses
+    if suggestions:
+        assert users, "Users must be provided to get suggestions"
 
     if users:
         user_ids = [u.id for u in users]
@@ -28,22 +33,24 @@ def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
     if skip_status and any(r.status in skip_status for r in responses):
         return {}
 
-    output = {}
-    selected_response = next((r for r in responses[::-1]), None)
-
+    data = {}
     for field in fields:
         if field in record.fields:
-            output[field] = record.fields[field]
+            data[field] = record.fields[field]
 
+    selected_response = next((r for r in responses[::-1]), None)
     for answer in answers:
         if selected_response and answer in selected_response.values:
-            output[answer] = selected_response.values[answer].value
+            data[answer] = selected_response.values[answer].value
+
+    for suggestion in suggestions:
+        data[suggestion] = get_record_suggestion_value(record, question_name=suggestion, users=users)
 
     for key in metadatas:
-        if key in record.metadata and key not in output:
-            output[key] = record.metadata[key]
+        if key in record.metadata and key not in data:
+            data[key] = record.metadata[key]
 
-    return output
+    return data
 
 
 @DeprecationWarning

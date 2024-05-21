@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Optional
 
 import argilla as rg
 
@@ -30,3 +30,13 @@ def update_record_suggestions(
         record.suggestions = updated_suggestions + list(new_suggestions_dict.values())
 
     return record
+
+
+def get_record_suggestion_value(record: RemoteFeedbackRecord, question_name: str, users: List[rg.User]) \
+        -> Optional[str]:
+    usernames = {user.username for user in users}
+    for suggestion in record.suggestions:
+        if suggestion.question_name == question_name and suggestion.agent in usernames:
+            return suggestion.value
+
+    return None

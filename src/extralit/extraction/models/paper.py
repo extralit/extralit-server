@@ -1,4 +1,6 @@
 import itertools
+import logging
+from datetime import datetime
 from typing import Dict, Iterator, Tuple, Optional, Union
 
 import pandas as pd
@@ -8,7 +10,7 @@ from pandera.api.base.model import MetaModel
 from pydantic.v1 import BaseModel, Field
 
 from extralit.schema.checks import register_check_methods
-
+_LOGGER = logging.getLogger(__name__)
 register_check_methods()
 
 
@@ -17,6 +19,7 @@ class PaperExtraction(BaseModel):
     extractions: Dict[str, pd.DataFrame] = Field(default_factory=dict)
     schemas: SchemaStructure = Field(..., description="The schema structure of the extraction.")
     durations: Dict[str, Optional[float]] = Field(default_factory=dict)
+    updated_at: Dict[str, Optional[datetime]] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True
@@ -44,6 +47,8 @@ class PaperExtraction(BaseModel):
                     df = overwrite_joined_columns(df, rsuffix='_joined')
                     if drop_joined_index and ref_index_name in df.index.names:
                         df = df.reset_index(level=ref_index_name, drop=True)
+                except NotImplementedError as e:
+                    _LOGGER.info(f'{ref_schema}-{schema.name} extraction table is already joined.')
                 except Exception as e:
                     print(f"Failed to join `{ref_schema}` to {schema.name}: {e}",
                           # df.shape, matching_df.shape, df.index.names, matching_df.index.names, df.columns, matching_df.columns

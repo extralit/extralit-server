@@ -14,7 +14,7 @@ def grits_from_batch(true_batch: Dict[str, PaperExtraction],
                      pred_batch: Dict[str, PaperExtraction],
                      exclude_columns: List[str] = [],
                      pairwise=False,
-                     index_levels: List[str] = ['Reference', 'Schema', 'Field'],
+                     index_names: List[str] = ['Reference', 'Schema', 'Field'],
                      compute_mean: Optional[str] = None,
                      **kwargs) \
         -> pd.DataFrame:
@@ -38,12 +38,18 @@ def grits_from_batch(true_batch: Dict[str, PaperExtraction],
             if not pred_extractions or not true_extractions:
                 continue
 
-            outputs = grits_paper(true_extractions, pred_extractions, exclude_columns=exclude_columns, **kwargs)
-            if outputs:
+            if isinstance(true_extractions, PaperExtraction):
+                outputs = grits_paper(true_extractions, pred_extractions, exclude_columns=exclude_columns, **kwargs)
                 metrics[batch] = pd.concat({str(k): v for k, v in outputs.items()}, axis=1).T
+            elif isinstance(true_extractions, list) and isinstance(true_extractions[0], pd.DataFrame):
+                outputs = grits_multi_tables(true_extractions, pred_extractions, **kwargs)
+                metrics[batch] = outputs
+            else:
+                raise ValueError(f"Invalid type for true_extractions: {type(true_extractions)}")
+
 
     metrics_df = pd.concat(metrics, axis=0)
-    metrics_df.index.names = index_levels[:metrics_df.index.nlevels]
+    metrics_df.index.names = index_names[:metrics_df.index.nlevels]
 
     if compute_mean:
         aggregated = metrics_df.groupby(compute_mean).mean()
@@ -170,13 +176,21 @@ def grits_from_pandas(true_df: pd.DataFrame,
 
 
 def grits_multi_tables(true_tables: List[Union[pd.DataFrame, str]], pred_tables: List[Union[pd.DataFrame, str]],
+                       only_common_columns=True,
                        **kwargs) -> pd.DataFrame:
-    results = defaultdict(dict)
+    results: Dict[str, pd.Series] = defaultdict(dict)
 
     for i, (true_df, pred_df) in enumerate(zip(true_tables, pred_tables)):
         try:
             if isinstance(true_df, pd.DataFrame):
-                results[i] = grits_from_pandas(true_df, pred_df, format='series', **kwargs)
+                if only_common_columns:
+                    only_columns = true_df.columns.intersection(pred_df.columns).difference(kwargs.get('index_columns', [])).tolist()
+                    kwargs.pop('only_columns', None)
+                else:
+                    only_columns = kwargs.pop('only_columns', None)
+
+                results[i] = grits_from_pandas(true_df, pred_df, format='series',
+                                               only_columns=only_columns, **kwargs)
 
             elif isinstance(true_df, str):
                 metrics = grits_from_html(
