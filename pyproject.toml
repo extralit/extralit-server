@@ -25,6 +25,7 @@ dependencies = [
     "pydantic",
     "rich != 13.1.0",
     "tqdm",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
@@ -84,14 +85,14 @@ extraction = [
     "weaviate-client ~= 3.26.2",
     "beautifulsoup4 ~= 4.12.2",
     "pandas ~= 2.2.2",
-    "pandera[io] ~= 0.18.3",
+    "pandera[io] ~= 0.19.3",
     "numpy ~= 1.26.4",
     "spacy ~= 3.7.2",
     "pyarrow == 14.*",
     "natsort ~= 8.4.0",
     "rapidfuzz ~= 3.8.1",
     "dill ~= 0.3.8",
-    "json_repair ~= 0.8.0",
+    "json-repair ~= 0.19.2",
     "fastparquet"
 ]
 nlp = [
@@ -103,14 +104,13 @@ ocr = [
     "timm == 0.5.4",
 ]
 pdf = [
-    "unstructured ~= 0.12.3",
+    "unstructured[pdf] ~= 0.12.3",
     "deepdoctection ~= 0.31.0",
+    "llmsherpa ~= 0.1.3",
+    "python-doctr ~= 0.8.1",
     "pypdf",
     "pypdfium2",
     "pdf2image ~= 1.16.0",
-    "pillow ~= 8.4.0",
-    "llmsherpa ~= 0.1.3",
-    "python-doctr ~= 0.8.1",
 ]
 llm = [
     "llama-index ~= 0.10.37",
