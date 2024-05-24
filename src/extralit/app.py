@@ -6,9 +6,7 @@ import pandas as pd
 from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
 from fastapi.responses import StreamingResponse
 
-import argilla as rg
 from langfuse.llama_index import LlamaIndexCallbackHandler
-from llama_index.core import BaseCallbackHandler
 
 from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
@@ -16,7 +14,7 @@ from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.server.context.files import get_minio_client
-from extralit.server.context.llamaindex import get_langfuse_global
+from extralit.server.context.llamaindex import get_langfuse_callback
 from extralit.server.context.vectordb import get_weaviate_client
 from extralit.server.context.datasets import get_argilla_dataset
 from extralit.server.models.extraction import ExtractionRequest, ExtractionResponse
@@ -24,19 +22,6 @@ from extralit.server.utils import astreamer
 
 _LOGGER = logging.getLogger(__name__)
 app = FastAPI()
-
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-
-@app.get("/index")
-async def load_vectorstore_index(
-        dataset=Depends(get_argilla_dataset, use_cache=True),
-        client=Depends(get_weaviate_client, use_cache=True),
-):
-    return {"message": "Hello World", 'client': str(client), 'argilla_client': str(dataset)}
 
 
 @app.get("/schemas/{workspace}")
@@ -81,34 +66,46 @@ async def completion(
         workspace: str = Query(...),
         username: Optional[Union[str, UUID]] = None,
         model: str = "gpt-4o",
+        prompt_template: Optional[str] = "default",
         similarity_top_k=3,
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
         minio_client=Depends(get_minio_client, use_cache=True),
-        global_handler: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_global, use_cache=True),
+        langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback, use_cache=True),
 ):
+    # Parse request
+    schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
+    schema = schemas[extraction_request.schema_name]
+
+    extraction_dfs = {}
+    for schema_name, extraction_dict in extraction_request.extractions.items():
+        schema = schemas[schema_name]
+        extraction_dfs[schema.name] = json_to_df(extraction_dict, schema=schema)
+
+    extractions = PaperExtraction(
+        reference=extraction_request.reference,
+        extractions=extraction_dfs,
+        schemas=schemas)
+
+    # Get the system prompt
     try:
-        schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
-        schema = schemas[extraction_request.schema_name]
+        system_prompt = langfuse_callback.langfuse.get_prompt(prompt_template, cache_ttl_seconds=3000)
+    except Exception as e:
+        _LOGGER.error(f"Failed to set system prompt: {e}")
+        system_prompt = None
 
-        extraction_dfs = {}
-        for schema_name, extraction_dict in extraction_request.extractions.items():
-            schema = schemas[schema_name]
-            extraction_dfs[schema.name] = json_to_df(extraction_dict, schema=schema)
-
-        extractions = PaperExtraction(
-            reference=extraction_request.reference,
-            extractions=extraction_dfs,
-            schemas=schemas)
-
-        ### Create or load the index ###
-        if global_handler is not None and hasattr(global_handler, 'set_trace_params'):
-            global_handler.set_trace_params(
+    try:
+        if isinstance(langfuse_callback, LlamaIndexCallbackHandler):
+            langfuse_callback.set_trace_params(
                 name=f"extract-{extraction_request.reference}",
                 user_id=username,
                 session_id=extraction_request.reference,
-                tags=[workspace, extraction_request.reference, extraction_request.schema_name],
+                tags=[workspace, extraction_request.reference, extraction_request.schema_name, 'partial-extraction'],
             )
+    except Exception as e:
+        _LOGGER.error(f"Failed to set trace params: {e}")
 
+    ### Create or load the index ###
+    try:
         index = create_or_load_vectorstore_index(
             paper=pd.Series(name=extraction_request.reference),
             weaviate_client=weaviate_client,
@@ -126,13 +123,16 @@ async def completion(
     try:
         ### Extract entities ###
         df, rag_response = extract_schema(
-            schema=schema, extractions=extractions, index=index, schema_structure=schemas,
-            similarity_top_k=similarity_top_k,
+            schema=schema,
+            extractions=extractions,
+            index=index,
             include_fields=extraction_request.columns,
             headers=extraction_request.headers,
             types=extraction_request.types,
-            extra_prompt=extraction_request.prompt,
-            verbose=1, )
+            similarity_top_k=similarity_top_k,
+            system_prompt=system_prompt,
+            user_prompt=extraction_request.prompt,
+        )
 
         if df.empty:
             if rag_response.source_nodes is None or len(rag_response.source_nodes) == 0:
@@ -146,5 +146,8 @@ async def completion(
         response = ExtractionResponse.parse_raw(df.to_json(orient='table'))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    if isinstance(langfuse_callback, LlamaIndexCallbackHandler):
+        langfuse_callback.flush()
 
     return response

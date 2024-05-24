@@ -45,6 +45,8 @@ spec:
             secretKeyRef:
               name: langfuse-secrets
               key: SALT
+        - name: ENABLE_EVENT_LOG
+          value: "false"
 ---
 apiVersion: v1
 kind: Service

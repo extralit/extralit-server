@@ -7,6 +7,7 @@ from typing import Tuple, Dict, Optional, List, Union
 
 import pandas as pd
 import pandera as pa
+from langfuse.model import TextPromptClient
 from llama_index.core import VectorStoreIndex, PromptTemplate, Response
 from llama_index.core.prompts import default_prompts
 from llama_index.core.vector_stores import (
@@ -19,7 +20,7 @@ from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
 from extralit.extraction.prompts import create_extraction_prompt, \
-    create_completion_prompt
+    create_completion_prompt, DEFAULT_SYSTEM_PROMPT_TMPL
 from extralit.extraction.schema import get_extraction_schema_model
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
@@ -35,7 +36,7 @@ def query_rag_index(
         similarity_top_k=20,
         filters: Optional[MetadataFilters] = None,
         response_mode="compact",
-        text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL),
+        text_qa_template=DEFAULT_SYSTEM_PROMPT_TMPL,
         **kwargs,
 ) -> Response:
     warnings.filterwarnings('ignore', module='pydantic')
@@ -62,9 +63,9 @@ def extract_schema(
         headers: Optional[List[str]] = None,
         types: Optional[List[str]] = None,
         similarity_top_k=20,
-        text_qa_template=PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL),
-        extra_prompt: Optional[str] = None,
-        verbose=True,
+        system_prompt: Union[PromptTemplate, TextPromptClient]=DEFAULT_SYSTEM_PROMPT_TMPL,
+        user_prompt: Optional[str] = None,
+        verbose=False,
         **kwargs,
     ) -> Tuple[pd.DataFrame, ResponseResult]:
     """
@@ -76,7 +77,7 @@ def extract_schema(
         similarity_top_k (int): The number of similar documents to retrieve. Defaults to 20.
         include_fields (Optional[List[str]]): A list of column names to include in the Pydantic model. Defaults to None.
         headers (Optional[List[str]]): The headers to filter the documents by. Defaults to None.
-        text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
+        system_prompt (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
         verbose (Optional[int]): The verbosity level. Defaults to None.
         **kwargs (Dict): Additional keyword arguments to pass to the `query_rag_llm` and `as_query_engine` function.
             text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
@@ -86,7 +87,7 @@ def extract_schema(
     """
 
     if schema.name in extractions.extractions:
-        prompt = create_completion_prompt(schema, extractions, include_fields=include_fields, extra_prompt=extra_prompt)
+        prompt = create_completion_prompt(schema, extractions, include_fields=include_fields, extra_prompt=user_prompt)
     else:
         prompt = create_extraction_prompt(schema, extractions, )
 
@@ -107,15 +108,22 @@ def extract_schema(
             MetadataFilter(key="type", value=types, operator=FilterOperator.IN)
         )
 
-    if verbose > 1:
-        _LOGGER.info(f'\nSCHEMA: {schema.name}\nPROMPT: {prompt}')
-    elif verbose:
+    if verbose:
         _LOGGER.info(f'Filters {filters.__repr__()}')
+
+    if isinstance(system_prompt, TextPromptClient):
+        system_prompt = PromptTemplate(system_prompt.get_langchain_prompt())
+    elif isinstance(system_prompt, PromptTemplate):
+        pass
+    else:
+        _LOGGER.warning(f"Invalid system_prompt type: {type(system_prompt)}, reverting to "
+                        f"DATA_EXTRACTION_SYSTEM_PROMPT_TMPL.")
+        system_prompt = DEFAULT_SYSTEM_PROMPT_TMPL
 
     response = query_rag_index(
         prompt, index=index, output_cls=output_cls,
         similarity_top_k=similarity_top_k, filters=filters,
-        text_qa_template=text_qa_template, response_mode="compact", **kwargs)
+        text_qa_template=system_prompt, response_mode="compact", **kwargs)
 
     df = convert_response_to_dataframe(response)
     df = generate_reference_columns(df, schema)
@@ -132,6 +140,7 @@ def extract_paper(
         paper: pd.Series,
         schema_structure: SchemaStructure,
         index: VectorStoreIndex = None,
+        prompt: str = "default",
         llm_models: Union[List[str], str]=["gpt-4o", 'gpt-4-turbo'],
         embed_model:str='text-embedding-ada-002',
         index_kwargs: Dict = None,
@@ -196,12 +205,12 @@ def extract_paper(
 
 
 def extract_schema_with_fallback(schema: pa.DataFrameSchema, extractions: PaperExtraction, index: VectorStoreIndex,
-                                 responses: ResponseResults, models: List[str], verbose: Optional[int]=0) -> pd.DataFrame:
+                                 responses: ResponseResults, models: List[str], verbose: Optional[int]=0, **kwargs) -> pd.DataFrame:
     for model in models:
         try:
             index.service_context.llm.model = model
             df, responses[schema.name] = extract_schema(schema=schema, extractions=extractions, index=index,
-                                                        verbose=verbose)
+                                                        verbose=verbose, **kwargs)
             return df
         except Exception as e:
             _LOGGER.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")

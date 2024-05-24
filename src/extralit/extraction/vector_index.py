@@ -101,7 +101,7 @@ def create_vectordb_index(text_documents: List[Document], table_documents: List[
 
 def create_or_load_vectorstore_index(
         paper: pd.Series,
-        llm_model="gpt-3.5-turbo",
+        llm_model="gpt-4o",
         embed_model='text-embedding-3-small',
         preprocessing_path='data/preprocessing/nougat/',
         preprocessing_dataset: rg.FeedbackDataset = None,

@@ -6,9 +6,9 @@ from langfuse.api import ObservationsView
 
 from extralit.extraction.models import PaperExtraction
 from extralit.metrics.extraction import grits_multi_tables
-from extralit.server.context.llamaindex import get_langfuse_global
+from extralit.server.context.llamaindex import get_langfuse_callback
 
-langfuse_callback = get_langfuse_global()
+langfuse_callback = get_langfuse_callback()
 langfuse_client = langfuse_callback.langfuse
 
 

@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import pandera as pa
 from llama_index.core import PromptTemplate
+from llama_index.core.prompts import default_prompts
 
 from extralit.extraction.models import PaperExtraction
 from extralit.extraction.schema import get_extraction_schema_model, drop_type_def_from_schema_json
@@ -17,21 +18,43 @@ Figure information is below.
 Answer:""")
 
 
+DATA_EXTRACTION_SYSTEM_PROMPT_TMPL = PromptTemplate(
+    """Your ability to extract and summarize this context accurately is essential for effective analysis. Pay close attention to the context's language, structure, and any cross-references to ensure a comprehensive and precise extraction of information. Do not use prior knowledge or information from outside the context to answer the questions. Only use the information provided in the context to answer the questions.\n"""
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Query: {query_str}\n"
+    "Answer: "
+)
+
+# DEFAULT_SYSTEM_PROMPT_TMPL = PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL)
+DEFAULT_SYSTEM_PROMPT_TMPL = DATA_EXTRACTION_SYSTEM_PROMPT_TMPL
+
+
+DATA_EXTRACTION_COMPLETION_PROMPT_TMPL = PromptTemplate(
+    "Your task is to extract data from a malaria research paper.\n"
+    "The {schema_name} details can be split across the provided context. Respond with details by looking at the whole context always.\n"
+    "If you don't find the information in the given context or you are not sure, "
+    "omit the key-value in your JSON response.\n"
+    "{dependencies_prompt}\n"
+    "{dependencies_data}\n"
+)
+
 def create_extraction_prompt(
         schema: pa.DataFrameSchema, extractions: PaperExtraction, filter_unique_cols=False) -> str:
     prompt = (
         f"Your task is to extract data from a malaria research paper.\n"
-        f"When given tables from the paper, use Chain-of-Thought to create a mapping of the table's columns to the "
-        f"`{schema.name}` schema fields.\n"
+        f"The `{schema.name}` details can be split across the provided context. Respond with details by looking at the whole context always.\n"
         f"If you don't find the information in the given context or you are not sure, "
         f"omit the key-value in your JSON response. ")
     schema_structure = extractions.schemas
     dependencies = schema_structure.upstream_dependencies[schema.name]
     if dependencies:
         prompt += (
-            f"The `{schema.name}` table you're extracting should be conditioned on the provided "
-            f"`{stringify_lists(dependencies, conjunction='and')}` "
-            f"data, however, each combination of references may have multiple `{schema.name}` data entries. "
+            f"The `{schema.name}` data you're extracting needs to be conditioned on the provided "
+            f"`{stringify_lists(dependencies, conjunction='and')}` tables which you need to reference, "
+            f"however, there can be multiple `{schema.name}` data entries for each unique combination of these references."
             f"Here are the data already extracted from the paper:\n\n")
 
     # Inject prior extraction data into the query
@@ -71,9 +94,9 @@ def create_completion_prompt(
         f'Please complete the following `{schema.name}` table by extracting the {include_fields} fields '
         f'for the following {len(existing_extraction)} entries.\n'
         f'{note}'
-        f'f"###{schema.name}###\n'
-        f"Data:\n"
-        f"{existing_extraction.reset_index().to_json(orient='index')}\n\n"
+        f'###{schema.name}###\n'
+        f'Data:\n'
+        f'{existing_extraction.reset_index().to_json(orient="index")}\n\n'
     )
 
     return prompt
