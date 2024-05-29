@@ -25,7 +25,7 @@ if 'kind' in k8s_context():
 
 # Installing elastic/elasticsearch Helm
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
-helm_repo('elastic', 'https://helm.elastic.co', labels=['elasticsearch'])
+helm_repo('elastic', 'https://helm.elastic.co', labels=['helm'])
 helm_resource(
     name='elasticsearch', 
     chart='elastic/elasticsearch', 
@@ -92,7 +92,7 @@ k8s_yaml('./k8s/langfuse-deployment.yaml')
 k8s_resource(
     'langfuse-deployment',
     port_forwards=['4000'],
-    labels=['langfuse'],
+    labels=['extralit'],
 )
 
 # Vector-Admin 
@@ -129,7 +129,7 @@ k8s_resource(
 
 
 # Add the MinIO Helm repository
-# helm_repo('minio', 'https://operator.min.io/', labels=['minio'])
+# helm_repo('minio', 'https://operator.min.io/', labels=['helm'])
 # Deploy the MinIO operator
 # k8s_yaml('./k8s/minio-tenant.yaml')
 # helm_resource(
@@ -153,7 +153,7 @@ k8s_resource(
 
 
 # Weaviate vector database
-helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['vectordb'])
+helm_repo('weaviate-helm', 'https://weaviate.github.io/weaviate-helm', labels=['helm'])
 helm_resource(
     name='weaviate', 
     chart='weaviate/weaviate', 
@@ -198,7 +198,7 @@ k8s_resource(
 
 
 # Cert-manager for SSL certificates
-# helm_repo('jetstack', 'https://charts.jetstack.io', labels=['security'])
+# helm_repo('jetstack', 'https://charts.jetstack.io', labels=['helm'])
 # helm_resource(
 #     name='cert-manager', 
 #     chart='jetstack/cert-manager', 

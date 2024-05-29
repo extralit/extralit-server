@@ -7,12 +7,14 @@ from llama_index.core import Settings, set_global_handler
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_langfuse_callback(public_key: Optional[str] = None, secret_key: Optional[str] = None) -> LlamaIndexCallbackHandler:
+def get_langfuse_callback(
+        langfuse_public_key: Optional[str] = None,
+        langfuse_secret_key: Optional[str] = None) -> LlamaIndexCallbackHandler:
     try:
         langfuse_callback_handler = LlamaIndexCallbackHandler(
             host=os.getenv('LANGFUSE_HOST'),
-            public_key=public_key if public_key else os.getenv('LANGFUSE_PUBLIC_KEY'),
-            secret_key=secret_key if secret_key else os.getenv('LANGFUSE_SECRET_KEY'),
+            public_key=langfuse_public_key if langfuse_public_key else os.getenv('LANGFUSE_PUBLIC_KEY'),
+            secret_key=langfuse_secret_key if langfuse_secret_key else os.getenv('LANGFUSE_SECRET_KEY'),
         )
         if not Settings.callback_manager.handlers:
             Settings.callback_manager.add_handler(langfuse_callback_handler)

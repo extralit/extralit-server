@@ -11,7 +11,7 @@ from tqdm import tqdm
 from extralit.convert.json_table import df_to_json
 from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.response import ResponseResults
-
+_LOGGER = logging.getLogger(__name__)
 
 def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
                               responses: Dict[str, ResponseResults],
@@ -47,7 +47,7 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
         for schema_name, extraction in extractions.items():
             schema = extractions.schemas[schema_name]
             if extraction is None or extraction.empty:
-                logging.warning(f'No {schema_name} extraction for {ref}')
+                _LOGGER.warning(f'No {schema_name} extraction for {ref}, generating an empty table.')
                 extraction = generate_empty_extraction(schema, size=2)
 
             ### fields ###

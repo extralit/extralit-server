@@ -28,6 +28,5 @@ RUN chown -R extralit:extralit /home/extralit
 USER extralit
 EXPOSE 5555
 
-RUN uv pip list
 # Run the command to start uVicorn server
 CMD ["uvicorn", "extralit.app:app", "--host", "0.0.0.0", "--port", "5555", "--reload"]

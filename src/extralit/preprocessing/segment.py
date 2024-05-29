@@ -91,6 +91,10 @@ class Segments(BaseModel):
 
         return cls(items=items)
 
+    @property
+    def duration(self):
+        return sum([item.duration or 0 for item in self.items])
+
     def __getitem__(self, index):
         return self.items[index]
 
@@ -155,6 +159,7 @@ class TextSegment(BaseModel):
     type: Optional[str] = Field('text', description="Type of the element", example="text", repr=False)
     original: Optional[Any] = Field(None, exclude=True,
                                     description="Original object from which the segment was extracted", repr=False)
+    duration: Optional[float] = Field(None, description="Duration spent in manual extraction", repr=False)
 
     def text_cleaned(self):
         return self.text.replace(' | ', ' ').replace("---", "").strip()

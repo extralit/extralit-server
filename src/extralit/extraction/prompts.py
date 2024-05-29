@@ -52,9 +52,9 @@ def create_extraction_prompt(
     dependencies = schema_structure.upstream_dependencies[schema.name]
     if dependencies:
         prompt += (
-            f"The `{schema.name}` data you're extracting needs to be conditioned on the provided "
-            f"`{stringify_lists(dependencies, conjunction='and')}` tables which you need to reference, "
-            f"however, there can be multiple `{schema.name}` data entries for each unique combination of these references."
+            f"The `{schema.name}` data you're extracting is dependent on the provided "
+            f"`{stringify_lists(dependencies, conjunction='and')}` tables containing entities which you need to reference. "
+            f"There can be multiple `{schema.name}` data entries for each unique combination of these references."
             f"Here are the data already extracted from the paper:\n\n")
 
     # Inject prior extraction data into the query
@@ -92,7 +92,8 @@ def create_completion_prompt(
 
     prompt += (
         f'Please complete the following `{schema.name}` table by extracting the {include_fields} fields '
-        f'for the following {len(existing_extraction)} entries.\n'
+        f'for the following {len(existing_extraction)} entries. The rows you\'re filling in may not match the same order '
+        f'as the rows in the provided context, so be sure to match the correct rows based on the existing values.\n'
         f'{note}'
         f'###{schema.name}###\n'
         f'Data:\n'
