@@ -8,19 +8,18 @@ from llama_index.core.vector_stores import (
     FilterOperator, FilterCondition,
 )
 from llama_index.vector_stores.weaviate.base import _to_weaviate_filter
-from llama_index.vector_stores.weaviate.utils import parse_get_response
-from weaviate import Client
+from llama_index.vector_stores.weaviate.utils import parse_get_response, validate_client, class_schema_exists
+from weaviate import Client, WeaviateClient
 
 
-def query_weaviate_db(weaviate_client: Client,
-                      index_name: str,
-                      filters: Union[Dict[str, Any], MetadataFilters],
-                      properties: Union[List, Dict] = ['reference', 'header', 'doc_id'],
-                      limit: Optional[int] = None) -> List[Dict[str, Any]]:
+def get_nodes_metadata(weaviate_client: WeaviateClient,
+                       filters: Union[Dict[str, Any], MetadataFilters],
+                       index_name: str='LlamaIndexDocumentSections',
+                       properties: Union[List, Dict] = ['header', 'page_number', 'type', 'reference', 'doc_id'],
+                       limit: Optional[int] = None) -> List[Dict[str, Any]]:
 
-    if not weaviate_client.is_ready():
-        raise ValueError("Weaviate client is not ready")
-    elif not weaviate_client.schema.contains({'class': index_name, 'properties': {}}):
+    validate_client(weaviate_client)
+    if not class_schema_exists(weaviate_client, index_name):
         return []
 
     if isinstance(filters, dict):
@@ -36,19 +35,19 @@ def query_weaviate_db(weaviate_client: Client,
             condition=FilterCondition.AND
         )
 
-    query_builder = weaviate_client.query \
-        .get(index_name, properties) \
-        .with_where(_to_weaviate_filter(filters))
-    if limit is not None:
-        query_builder.with_limit(limit)
+    collection = weaviate_client.collections.get(index_name)
 
-    query_result = query_builder.do()
-    parsed_result = parse_get_response(query_result)
-    entries = parsed_result[index_name]
+    query_result = collection.query.fetch_objects(
+        filters=_to_weaviate_filter(filters),
+        return_properties=properties,
+        limit=limit,
+    )
+
+    entries = [o.properties for o in query_result.objects]
     return entries
 
 
-def delete_from_weaviate_db(weaviate_client: Client, doc_ids: List[str], index_name: str) -> int:
+def delete_from_weaviate_db(weaviate_client: WeaviateClient, doc_ids: List[str], index_name: str) -> int:
     """
     Delete documents from Weaviate database using their document IDs.
 
@@ -84,12 +83,12 @@ def delete_from_weaviate_db(weaviate_client: Client, doc_ids: List[str], index_n
     return len(entries)
 
 
-def vectordb_has_document(reference:str, weaviate_client: Client, index_name: str) -> bool:
+def vectordb_contains_any(reference: str, weaviate_client: WeaviateClient, index_name: str) -> bool:
     if weaviate_client is None:
         return False
 
-    has_document_in_vecstore = query_weaviate_db(
-        weaviate_client, index_name,
+    has_document_in_vecstore = get_nodes_metadata(
+        weaviate_client, index_name=index_name,
         filters={'reference': reference},
         properties=['doc_id', 'reference'],
         limit=1)

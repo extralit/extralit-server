@@ -31,7 +31,7 @@ spec:
                 name: extralit-secrets
                 key: ARGILLA_API_KEY
           - name: WCS_HTTP_URL
-            value: "http://weaviate"
+            value: "weaviate"
           - name: WCS_GRPC_URL
             value: "weaviate-grpc"
           - name: WCS_API_KEY

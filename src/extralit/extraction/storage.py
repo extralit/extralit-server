@@ -2,25 +2,13 @@ import os
 from typing import Optional
 
 from llama_index.core import StorageContext
-from extralit.extraction.vector_store import WeaviateVectorStore
+from extralit.extraction.vector_store import WeaviateVectorStore, create_default_schema
 from llama_index.vector_stores.weaviate.utils import class_schema_exists, NODE_SCHEMA, validate_client
-from weaviate import Client
-
-
-def _create_default_schema(weaviate_client: Client, class_name: str) -> None:
-    """Create a default weaviate index schema ."""
-    validate_client(weaviate_client)
-    class_schema = {
-        "class": class_name,
-        "description": f"Class for {class_name}",
-        "properties": NODE_SCHEMA,
-        'vectorIndexType': 'flat',
-    }
-    weaviate_client.schema.create_class(class_schema)
+from weaviate import Client, WeaviateClient
 
 
 def get_storage_context(
-        weaviate_client: Optional[Client] = None,
+        weaviate_client: Optional[WeaviateClient] = None,
         persist_dir: Optional[str] = None,
         index_name: Optional[str] = None) -> StorageContext:
     """
@@ -36,10 +24,11 @@ def get_storage_context(
     """
     kwargs = {}
     if weaviate_client:
-        assert weaviate_client.is_ready() and index_name
+        assert index_name
+        validate_client(weaviate_client)
         schema_exists = class_schema_exists(client=weaviate_client, class_name=index_name)
         if not schema_exists:
-            _create_default_schema(weaviate_client=weaviate_client, class_name=index_name)
+            create_default_schema(client=weaviate_client, class_name=index_name)
 
         vector_store = WeaviateVectorStore(
             weaviate_client=weaviate_client,

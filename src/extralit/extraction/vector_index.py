@@ -14,11 +14,12 @@ from llama_index.core.storage import StorageContext
 from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.embeddings.openai import OpenAIEmbeddingMode, OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from extralit.extraction.vector_store import WeaviateVectorStore
-from weaviate import Client
+from llama_index.vector_stores.weaviate import WeaviateVectorStore
+# from extralit.extraction.vector_store import WeaviateVectorStore
+from weaviate import Client, WeaviateClient
 
 from extralit.extraction.chunking import create_documents
-from extralit.extraction.query import query_weaviate_db, delete_from_weaviate_db, vectordb_has_document
+from extralit.extraction.query import get_nodes_metadata, delete_from_weaviate_db, vectordb_contains_any
 from extralit.extraction.storage import get_storage_context
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
@@ -64,15 +65,15 @@ def create_local_index(text_documents: List[Document], table_documents: List[Doc
 
 def create_vectordb_index(text_documents: List[Document], table_documents: List[Document],
                           reference: str,
-                          weaviate_client: Client, index_name: Optional[str] = "LlamaIndexDocumentSections",
+                          weaviate_client: WeaviateClient, index_name: Optional[str] = "LlamaIndexDocumentSections",
                           embed_model='text-embedding-3-small', dimensions=1536, retrieval_mode=DEFAULT_RETRIEVAL_MODE,
                           overwrite=True,
                           chunk_size=4096, chunk_overlap=200, verbose=True, ) \
         -> VectorStoreIndex:
     print(
         f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
-    if vectordb_has_document(reference, weaviate_client, index_name) and overwrite:
-        docs = query_weaviate_db(
+    if vectordb_contains_any(reference, weaviate_client, index_name) and overwrite:
+        docs = get_nodes_metadata(
             weaviate_client, index_name=index_name, filters={'reference': reference},
             properties=['doc_id', 'reference'],
             limit=None)
@@ -106,7 +107,7 @@ def create_or_load_vectorstore_index(
         preprocessing_path='data/preprocessing/nougat/',
         preprocessing_dataset: rg.FeedbackDataset = None,
         reindex=False,
-        weaviate_client: Optional[Client] = None,
+        weaviate_client: Optional[WeaviateClient] = None,
         index_name: Optional[str] = "LlamaIndexDocumentSections",
         persist_dir='data/interim/vectorstore/',
         **kwargs
@@ -133,7 +134,7 @@ def create_or_load_vectorstore_index(
     """
     local_dir = join(persist_dir, paper.name, embed_model)
 
-    if reindex or (not exists(local_dir) and not vectordb_has_document(paper.name, weaviate_client, index_name)):
+    if reindex or (not exists(local_dir) and not vectordb_contains_any(paper.name, weaviate_client, index_name)):
         assert preprocessing_path is not None or preprocessing_dataset is not None, \
             "Either preprocessing_path or preprocessing_dataset must be given"
         text_documents, table_documents = create_documents(

@@ -82,7 +82,7 @@ extraction = [
     "fastapi < 1.0.0",
     "pydantic",
     "pypandoc ~= 1.13",
-    "weaviate-client ~= 3.26.2",
+    "weaviate-client ~= 4.5.7",
     "beautifulsoup4 ~= 4.12.2",
     "pandas ~= 2.2.2",
     "pandera[io] ~= 0.19.3",
@@ -113,9 +113,9 @@ pdf = [
     "pdf2image ~= 1.16.0",
 ]
 llm = [
-    "llama-index ~= 0.10.37",
-    "llama-index-core ~= 0.10.37",
-    "llama-index-vector-stores-weaviate ~= 0.1.5",
+    "llama-index ~= 0.10.40",
+    "llama-index-core ~= 0.10.40",
+    "llama-index-vector-stores-weaviate ~= 1.0.0",
     "llama-index-callbacks-langfuse ~= 0.1.4",
     "llama-index-llms-openai",
     "llama-index-embeddings-openai",
