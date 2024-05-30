@@ -19,7 +19,7 @@ RUN useradd -ms /bin/bash argilla
 RUN mkdir -p "$ARGILLA_HOME_PATH" && \
   chown argilla:argilla "$ARGILLA_HOME_PATH" && \
   apt-get update -q && \
-  apt-get install -q -y python-dev-is-python3 libpq-dev gcc nano && \
+  apt-get install -q --no-install-recommends -y python-dev-is-python3 libpq-dev gcc nano && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
@@ -38,8 +38,7 @@ RUN pip install -q uv && uv venv /opt/venv && source /opt/venv/bin/activate
 ENV PATH="/opt/venv/bin:$PATH"
 ENV VIRTUAL_ENV="/opt/venv"
 
-RUN uv pip install -q uvicorn[standard]
-RUN uv pip install -q -e ".[argilla_server,postgresql]"
+RUN uv pip install -q uvicorn[standard] && uv pip install -q -e ".[argilla_server,postgresql]"
   
 RUN chmod +x /home/argilla/start_argilla_server.sh && \
   chown -R argilla:argilla /home/argilla
