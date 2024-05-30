@@ -70,7 +70,7 @@ def create_vectordb_index(text_documents: List[Document], table_documents: List[
                           chunk_size=4096, chunk_overlap=200, verbose=True, ) \
         -> VectorStoreIndex:
     print(
-        f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate DB, `index_name={index_name}`")
+        f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
     if vectordb_has_document(reference, weaviate_client, index_name) and overwrite:
         docs = query_weaviate_db(
             weaviate_client, index_name=index_name, filters={'reference': reference},

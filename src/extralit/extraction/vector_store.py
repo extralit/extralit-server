@@ -21,11 +21,10 @@ from llama_index.core.vector_stores.utils import DEFAULT_TEXT_KEY
 from llama_index.vector_stores.weaviate.utils import (
     add_node,
     class_schema_exists,
-    create_default_schema,
     get_all_properties,
     get_node_similarity,
     parse_get_response,
-    to_node,
+    to_node, validate_client, NODE_SCHEMA,
 )
 
 import weaviate  # noqa
@@ -94,6 +93,18 @@ def _to_weaviate_filter(standard_filters: MetadataFilters) -> Dict[str, Any]:
         return filters_list[0]
 
     return {"operands": filters_list, "operator": condition}
+
+
+def create_default_schema(client: Any, class_name: str) -> None:
+    """Create default schema."""
+    validate_client(client)
+    class_schema = {
+        "class": class_name,
+        "description": f"Class for {class_name}",
+        "properties": NODE_SCHEMA,
+        # "multiTenancyConfig": {"enabled": True},
+    }
+    client.schema.create_class(class_schema)
 
 
 class WeaviateVectorStore(BasePydanticVectorStore):

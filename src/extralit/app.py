@@ -33,10 +33,11 @@ async def get_schemas(
     return ss.ordering
 
 
-@app.get("/question/{reference}/{query}")
-async def completion(
+@app.get("/chat/{reference}/{query}")
+async def chat(
         reference: str,
         query: str,
+        llm_model="gpt-3.5-turbo",
         dataset=Depends(get_argilla_dataset, use_cache=True),
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
 ):
@@ -44,7 +45,7 @@ async def completion(
         paper=pd.Series(name=reference),
         weaviate_client=weaviate_client,
         preprocessing_dataset=dataset,
-        llm_model="gpt-3.5-turbo",
+        llm_model=llm_model,
         embed_model='text-embedding-3-small',
         reindex=False,
         index_name="LlamaIndexDocumentSections",
