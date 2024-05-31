@@ -25,18 +25,22 @@ async def proxy(request: Request, rest_of_path: str,
     _LOGGER.info(f'PROXY {url} {params}')
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        if request.method == "GET":
-            r = await client.get(url, params=params)
-        elif request.method == "POST":
-            data = await request.json()
-            r = await client.post(url, json=data, params=params)
-        elif request.method == "PUT":
-            data = await request.json()
-            r = await client.put(url, data=data, params=params)
-        elif request.method == "DELETE":
-            r = await client.delete(url, params=params)
-        else:
-            return {"message": "Method not supported"}
+        r = await client.request(
+            method=request.method, url=url, params=params, 
+            data=await request.body(), headers=request.headers, 
+            stream=True, )
+        # if request.method == "GET":
+        #     r = await client.get(url, params=params)
+        # elif request.method == "POST":
+        #     data = await request.json()
+        #     r = await client.post(url, json=data, params=params)
+        # elif request.method == "PUT":
+        #     data = await request.json()
+        #     r = await client.put(url, data=data, params=params)
+        # elif request.method == "DELETE":
+        #     r = await client.delete(url, params=params)
+        # else:
+        #     return {"message": "Method not supported"}
 
     async def content_generator():
         async for chunk in r.aiter_bytes():

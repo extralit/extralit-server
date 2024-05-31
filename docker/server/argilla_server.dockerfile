@@ -40,7 +40,7 @@ ENV VIRTUAL_ENV="/opt/venv"
 
 RUN uv pip install -q uvicorn[standard] && uv pip install -q -e ".[argilla_server,postgresql]"
   
-RUN chmod +x /home/argilla/start_argilla_server.sh && \
+RUN chmod +x /home/argilla/start_argilla_server.sh /home/argilla/check_search_engine.sh && \
   chown -R argilla:argilla /home/argilla
 
 # Switch to the argilla user
