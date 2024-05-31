@@ -42,13 +42,11 @@ async def chat(
         reference: str,
         query: str,
         llm_model="gpt-3.5-turbo",
-        dataset=Depends(get_argilla_dataset, use_cache=True),
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
 ):
     index = create_or_load_vectorstore_index(
         paper=pd.Series(name=reference),
         weaviate_client=weaviate_client,
-        preprocessing_dataset=dataset,
         llm_model=llm_model,
         embed_model='text-embedding-3-small',
         reindex=False,
@@ -60,7 +58,7 @@ async def chat(
     )
 
     response = query_engine.query(query)
-    return StreamingResponse(astreamer(response.response_gen), media_type="text/event-stream")
+    return StreamingResponse(response.response_gen, media_type="text/event-stream")
 
 
 @app.post("/completion", status_code=status.HTTP_201_CREATED,
@@ -77,7 +75,6 @@ async def completion(
         minio_client=Depends(get_minio_client, use_cache=True),
         langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback, use_cache=True),
 ):
-    # Parse request
     schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
     schema = schemas[extraction_request.schema_name]
 

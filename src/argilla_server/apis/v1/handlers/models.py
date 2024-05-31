@@ -10,11 +10,13 @@ from argilla_server.models import User
 from argilla_server.security import auth
 from argilla_server.settings import settings
 
-_LOGGER = logging.getLogger("files")
+_LOGGER = logging.getLogger("models")
 
 router = APIRouter(tags=["models"])
 
-@router.api_route("/models/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/models/{rest_of_path:path}", 
+                  methods=["GET", "POST", "PUT", "DELETE"], 
+                  response_class=StreamingResponse)
 async def proxy(request: Request, rest_of_path: str,
                 current_user: User = Depends(auth.get_optional_current_user)):
     url = urljoin(settings.extralit_url, rest_of_path)
@@ -24,28 +26,25 @@ async def proxy(request: Request, rest_of_path: str,
 
     _LOGGER.info(f'PROXY {url} {params}')
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.request(
-            method=request.method, url=url, params=params, 
-            data=await request.body(), headers=request.headers, 
-            stream=True, )
-        # if request.method == "GET":
-        #     r = await client.get(url, params=params)
-        # elif request.method == "POST":
-        #     data = await request.json()
-        #     r = await client.post(url, json=data, params=params)
-        # elif request.method == "PUT":
-        #     data = await request.json()
-        #     r = await client.put(url, data=data, params=params)
-        # elif request.method == "DELETE":
-        #     r = await client.delete(url, params=params)
-        # else:
-        #     return {"message": "Method not supported"}
+    client = httpx.AsyncClient(timeout=60.0)
+    if request.method == "GET":
+        request = client.build_request("GET", url, params=params)
+    elif request.method == "POST":
+        data = await request.json()
+        request = client.build_request("POST", url, json=data, params=params)
+    elif request.method == "PUT":
+        data = await request.json()
+        request = client.build_request("PUT", url, data=data, params=params)
+    elif request.method == "DELETE":
+        request = client.build_request("DELETE", url, params=params)
+    else:
+        return {"message": "Method not supported"}
 
-    async def content_generator():
-        async for chunk in r.aiter_bytes():
+    async def stream_response():
+        response = await client.send(request, stream=True)
+        async for chunk in response.aiter_raw():
             yield chunk
+        client.aclose()
 
-    return StreamingResponse(content_generator(), status_code=r.status_code, 
-                             headers=r.headers, media_type=r.headers.get('content-type'))
-
+    return StreamingResponse(stream_response(), media_type="text/event-stream")
+    
