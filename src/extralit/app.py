@@ -1,11 +1,10 @@
 import logging
-from typing import Optional, Union, Dict, List, Literal
+from typing import Optional, Union, List, Literal
 from uuid import UUID
 
 import pandas as pd
 from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
 from fastapi.responses import StreamingResponse
-
 from langfuse.llama_index import LlamaIndexCallbackHandler
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 from weaviate import WeaviateClient
@@ -19,10 +18,8 @@ from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.server.context.files import get_minio_client
 from extralit.server.context.llamaindex import get_langfuse_callback
 from extralit.server.context.vectordb import get_weaviate_client
-from extralit.server.context.datasets import get_argilla_dataset
 from extralit.server.models.extraction import ExtractionRequest, ExtractionResponse
 from extralit.server.models.segments import SegmentsResponse
-from extralit.server.utils import astreamer
 
 _LOGGER = logging.getLogger(__name__)
 app = FastAPI()
@@ -67,10 +64,10 @@ async def completion(
         *,
         extraction_request: ExtractionRequest = Body(...),
         workspace: str = Query(...),
-        username: Optional[Union[str, UUID]] = None,
-        model: str = "gpt-4o",
-        prompt_template: Optional[str] = "default",
+        model: str = "gpt-3.5-turbo",
+        prompt_template: str = "default",
         similarity_top_k=3,
+        username: Optional[Union[str, UUID]] = None,
         weaviate_client=Depends(get_weaviate_client, use_cache=True),
         minio_client=Depends(get_minio_client, use_cache=True),
         langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback, use_cache=True),
@@ -161,9 +158,9 @@ async def segments(
         workspace: str = Query(...),
         reference: str = Query(...),
         types: Optional[List[Literal['text', 'table', 'figure']]] = Query(None),
-        username: Optional[Union[str, UUID]] = None,
+        username: Optional[Union[str, UUID]] = Query(None),
         limit=100,
-        weaviate_client: WeaviateClient=Depends(get_weaviate_client, use_cache=True),
+        weaviate_client: WeaviateClient = Depends(get_weaviate_client, use_cache=True),
 ):
     filters = []
 
