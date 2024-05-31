@@ -24,7 +24,7 @@ RUN mkdir -p "$ARGILLA_HOME_PATH" && \
   rm -rf /var/lib/apt/lists/*
 
 # Copy the scripts and install uvicorn
-COPY docker/server/scripts/start_argilla_server.sh /home/argilla/
+COPY docker/server/scripts/ /home/argilla/
 
 # Copy the entire repository into /home/argilla in the container
 COPY . /home/argilla/

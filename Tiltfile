@@ -57,7 +57,7 @@ docker_build(
 argilla_server_k8s_yaml = read_yaml_stream('./k8s/argilla-server-deployment.yaml')
 for o in argilla_server_k8s_yaml:
     for container in o['spec']['template']['spec']['containers']:
-        if container['name'] == 'argilla-server':
+        if container['image'] == 'extralit-argilla-server':
             container['image'] = "{DOCKER_REPO}/extralit-argilla-server".format(DOCKER_REPO=DOCKER_REPO)
 
 k8s_yaml([
@@ -100,7 +100,7 @@ k8s_yaml('./k8s/vector-admin-deployment.yaml')
 k8s_resource(
     'vector-admin-deployment',
     port_forwards=['3001:3001'],
-    labels=['vectordb'],
+    labels=['extralit'],
 )
 
 
@@ -148,7 +148,7 @@ k8s_yaml(['./k8s/minio-dev.yaml', './k8s/minio-standalone-pvc.yaml'])
 k8s_resource(
   'minio',
   port_forwards=['9000', '9090'],
-  labels=['minio'],
+  labels=['storage'],
 )
 
 
@@ -162,7 +162,7 @@ helm_resource(
         '--values=./k8s/helm/weaviate-helm.yaml'],
     deps=['./k8s/helm/weaviate-helm.yaml'],
     port_forwards=['8080:8080', '50051:50051'],
-    labels=['vectordb']
+    labels=['extralit']
 )
 
 

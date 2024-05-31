@@ -29,14 +29,20 @@ esMajorVersion: ""
 # such as elasticsearch.yml and log4j2.properties
 esConfig: 
   elasticsearch.yml: |
-    ingest.geoip.downloader.enabled: false
-    cluster.routing.allocation.enable: all
-    cluster.routing.allocation.node_concurrent_recoveries: 2
-    cluster.routing.allocation.node_initial_primaries_recoveries: 5
-    cluster.routing.allocation.same_shard.host: true
-    cluster.routing.rebalance.enable: all
-    discovery.seed_hosts: ["elasticsearch-master-0"]
-    cluster.initial_master_nodes: ["elasticsearch-master-0"]
+    ingest:
+      geoip:
+        downloader:
+          enabled: false
+    cluster:
+      routing:
+        allocation:
+          enable: all
+          node_concurrent_recoveries: 2
+          node_initial_primaries_recoveries: 5
+          same_shard:
+            host: true
+        rebalance:
+          enable: all
 
 createCert: true
 
@@ -113,7 +119,7 @@ volumeClaimTemplate:
   storageClassName: k8s-storage-policy
   resources:
     requests:
-      storage: 2Gi
+      storage: 8Gi
 
 rbac:
   create: false

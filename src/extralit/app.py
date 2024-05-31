@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Union, Dict, List
+from typing import Optional, Union, Dict, List, Literal
 from uuid import UUID
 
 import pandas as pd
@@ -7,17 +7,21 @@ from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
 from fastapi.responses import StreamingResponse
 
 from langfuse.llama_index import LlamaIndexCallbackHandler
+from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+from weaviate import WeaviateClient
 
 from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
 from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
+from extralit.extraction.query import get_nodes_metadata
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.server.context.files import get_minio_client
 from extralit.server.context.llamaindex import get_langfuse_callback
 from extralit.server.context.vectordb import get_weaviate_client
 from extralit.server.context.datasets import get_argilla_dataset
 from extralit.server.models.extraction import ExtractionRequest, ExtractionResponse
+from extralit.server.models.segments import SegmentsResponse
 from extralit.server.utils import astreamer
 
 _LOGGER = logging.getLogger(__name__)
@@ -152,3 +156,27 @@ async def completion(
         langfuse_callback.flush()
 
     return response
+
+@app.get("/segments/", status_code=status.HTTP_201_CREATED,
+          response_model=SegmentsResponse)
+async def segments(
+        *,
+        workspace: str = Query(...),
+        reference: str = Query(...),
+        types: Optional[List[Literal['text', 'table', 'figure']]] = Query(None),
+        username: Optional[Union[str, UUID]] = None,
+        limit=100,
+        weaviate_client: WeaviateClient=Depends(get_weaviate_client, use_cache=True),
+):
+    filters = []
+
+    if types:
+        filters.append(MetadataFilter(key="type", value=types, operator=FilterOperator.NE))
+
+    filters.append(MetadataFilter(key="reference", value=reference, operator=FilterOperator.EQ))
+
+    entries = get_nodes_metadata(
+        weaviate_client=weaviate_client, filters=MetadataFilters(filters=filters),
+        limit=limit, index_name="LlamaIndexDocumentSections",
+    )
+    return SegmentsResponse(items=entries)

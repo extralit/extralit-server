@@ -15,6 +15,9 @@ if [ "$DEFAULT_USER_ENABLED" = "true" ]; then
 	python -m argilla_server database users create_default --password $DEFAULT_USER_PASSWORD --api-key $DEFAULT_USER_API_KEY
 fi
 
+# Check search engine index
+./check_search_engine.sh
+
 # Run argilla-server (See https://www.uvicorn.org/settings/#settings)
 #
 # From uvicorn docs:

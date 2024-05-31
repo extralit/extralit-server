@@ -6,12 +6,7 @@ from weaviate import WeaviateClient
 
 def get_weaviate_client() -> Optional[WeaviateClient]:
     if 'WCS_HTTP_URL' in os.environ:
-        api_keys = os.getenv('WCS_API_KEY', '')
-
-        # client = weaviate.Client(
-        #     url=os.getenv("WCS_HTTP_URL", None),
-        #     auth_client_secret=weaviate.auth.AuthApiKey(api_keys.split(',')[0])
-        # )
+        api_keys = os.getenv('WCS_API_KEY', '').split(',')
 
         weaviate_client = weaviate.connect_to_custom(
             http_host=os.getenv("WCS_HTTP_URL"),
@@ -20,7 +15,7 @@ def get_weaviate_client() -> Optional[WeaviateClient]:
             grpc_host=os.getenv('WCS_GRPC_URL'),
             grpc_port=50051,
             grpc_secure=False,
-            auth_credentials=weaviate.auth.AuthApiKey(os.getenv("WCS_API_KEY")),
+            auth_credentials=weaviate.auth.AuthApiKey(api_keys[0]),
             headers={
                 "X-OpenAI-Api-Key": os.environ["OPENAI_API_KEY"]
             }
