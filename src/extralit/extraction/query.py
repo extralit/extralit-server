@@ -1,15 +1,13 @@
-import logging
 from typing import List, Dict, Any, Optional, Union
 
-import pandas as pd
 from llama_index.core.vector_stores import (
     MetadataFilter,
     MetadataFilters,
     FilterOperator, FilterCondition,
 )
 from llama_index.vector_stores.weaviate.base import _to_weaviate_filter
-from llama_index.vector_stores.weaviate.utils import parse_get_response, validate_client, class_schema_exists
-from weaviate import Client, WeaviateClient
+from llama_index.vector_stores.weaviate.utils import validate_client, class_schema_exists
+from weaviate import WeaviateClient
 
 
 def get_nodes_metadata(weaviate_client: WeaviateClient,
@@ -45,42 +43,6 @@ def get_nodes_metadata(weaviate_client: WeaviateClient,
 
     entries = [o.properties for o in query_result.objects]
     return entries
-
-
-def delete_from_weaviate_db(weaviate_client: WeaviateClient, doc_ids: List[str], index_name: str) -> int:
-    """
-    Delete documents from Weaviate database using their document IDs.
-
-    Args:
-        weaviate_client (Client): The Weaviate client.
-        doc_ids (List[str]): The list of document IDs to delete.
-
-    """
-    if isinstance(doc_ids, str):
-        doc_ids = [doc_ids]
-
-    where_filter = {
-        "path": ["doc_id"],
-        "operator": "ContainsAny",
-        "valueText": doc_ids,
-    }
-
-    query = (
-        weaviate_client.query.get(index_name, ['doc_id'])
-        .with_additional(["id"])
-        .with_where(where_filter)
-        .with_limit(10000)  # 10,000 is the max Weaviate can fetch
-    )
-
-    query_result = query.do()
-    parsed_result = parse_get_response(query_result)
-    entries = parsed_result[index_name]
-    for entry in entries:
-        weaviate_client.data_object.delete(entry["_additional"]["id"], index_name)
-
-    logging.info(f"Deleted {len(entries)} documents from Weaviate index {index_name}")
-    print(f"Deleted {len(entries)} documents from Weaviate index {index_name}")
-    return len(entries)
 
 
 def vectordb_contains_any(reference: str, weaviate_client: WeaviateClient, index_name: str) -> bool:

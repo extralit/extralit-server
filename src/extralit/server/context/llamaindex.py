@@ -1,15 +1,16 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from langfuse.llama_index import LlamaIndexCallbackHandler
+from langfuse.utils.base_callback_handler import LangfuseBaseCallbackHandler
 from llama_index.core import Settings, set_global_handler
-_LOGGER = logging.getLogger(__name__)
 
+_LOGGER = logging.getLogger(__name__)
 
 def get_langfuse_callback(
         langfuse_public_key: Optional[str] = None,
-        langfuse_secret_key: Optional[str] = None) -> LlamaIndexCallbackHandler:
+        langfuse_secret_key: Optional[str] = None) -> Union[LangfuseBaseCallbackHandler, LlamaIndexCallbackHandler]:
     try:
         langfuse_callback_handler = LlamaIndexCallbackHandler(
             host=os.getenv('LANGFUSE_HOST'),

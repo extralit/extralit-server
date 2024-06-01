@@ -5,15 +5,16 @@ An index that is built on top of an existing vector store.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast, Union, Callable
+from typing import Any, List, Optional, Union, Callable
 
+import weaviate  # noqa
+import weaviate.classes as wvc
 from llama_index.core.schema import BaseNode
 from llama_index.core.vector_stores.types import (
     MetadataFilters,
     VectorStoreQuery,
     VectorStoreQueryMode,
-    VectorStoreQueryResult, FilterOperator, FilterCondition,
-)
+    VectorStoreQueryResult, FilterOperator, )
 from llama_index.vector_stores.weaviate import WeaviateVectorStore as WeaviateVectorStoreV0_10_0
 from llama_index.vector_stores.weaviate.utils import (
     get_all_properties,
@@ -21,10 +22,7 @@ from llama_index.vector_stores.weaviate.utils import (
     to_node, validate_client, NODE_SCHEMA,
 )
 
-import weaviate  # noqa
-import weaviate.classes as wvc
-
-_logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 def _transform_weaviate_filter_condition(condition: str) -> Callable:
@@ -115,7 +113,6 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
         if node_ids is not None:
             filters = wvc.query.Filter.by_property("id").contains_any(node_ids)
 
-        print(filters)
         query_result = collection.query.fetch_objects(
             filters=filters,
             return_properties=all_properties,
@@ -125,6 +122,24 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
         entries = [to_node(o.__dict__) for o in query_result.objects]
         return entries
 
+    def delete_nodes(
+            self,
+            node_ids: Optional[List[str]] = None,
+            filters: Optional[MetadataFilters] = None,
+            **delete_kwargs: Any,
+    ) -> None:
+        collection = self._client.collections.get(self.index_name)
+
+        if filters is not None:
+            filters = _to_weaviate_filter(filters)
+
+        # list of documents to constrain search
+        if node_ids is not None:
+            filters = wvc.query.Filter.by_property("id").contains_any(node_ids)
+
+        results = collection.delete_objects(filters=filters, **delete_kwargs)
+        print(f"Deleted {results['results']['successful']} nodes")
+        _LOGGER.debug(f"Deleted {results['results']['successful']} nodes")
 
     def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """Query index for top k most similar nodes."""
@@ -144,11 +159,11 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
         vector = query.query_embedding
         similarity_key = "distance"
         if query.mode == VectorStoreQueryMode.DEFAULT:
-            _logger.debug("Using vector search")
+            _LOGGER.debug("Using vector search")
             if vector is not None:
                 alpha = 1
         elif query.mode == VectorStoreQueryMode.HYBRID:
-            _logger.debug(f"Using hybrid search with alpha {query.alpha}")
+            _LOGGER.debug(f"Using hybrid search with alpha {query.alpha}")
             similarity_key = "score"
             if vector is not None and query.query_str:
                 alpha = query.alpha
@@ -159,7 +174,7 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
             filters = kwargs["filter"]
 
         limit = query.similarity_top_k
-        _logger.debug(f"Using limit of {query.similarity_top_k}")
+        _LOGGER.debug(f"Using limit of {query.similarity_top_k}")
 
         # execute query
         try:

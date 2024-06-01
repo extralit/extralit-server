@@ -11,15 +11,15 @@ from llama_index.core.node_parser import SentenceSplitter, JSONNodeParser
 from llama_index.core.schema import Document
 from llama_index.core.service_context import ServiceContext
 from llama_index.core.storage import StorageContext
-from llama_index.core.vector_stores import SimpleVectorStore
+from llama_index.core.vector_stores import SimpleVectorStore, MetadataFilters, MetadataFilter, FilterOperator
 from llama_index.embeddings.openai import OpenAIEmbeddingMode, OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 # from extralit.extraction.vector_store import WeaviateVectorStore
-from weaviate import Client, WeaviateClient
+from weaviate import WeaviateClient
 
 from extralit.extraction.chunking import create_documents
-from extralit.extraction.query import get_nodes_metadata, delete_from_weaviate_db, vectordb_contains_any
+from extralit.extraction.query import vectordb_contains_any
 from extralit.extraction.storage import get_storage_context
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
@@ -72,14 +72,14 @@ def create_vectordb_index(text_documents: List[Document], table_documents: List[
         -> VectorStoreIndex:
     print(
         f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
-    if vectordb_contains_any(reference, weaviate_client, index_name) and overwrite:
-        docs = get_nodes_metadata(
-            weaviate_client, index_name=index_name, filters={'reference': reference},
-            properties=['doc_id', 'reference'],
-            limit=None)
-        delete_from_weaviate_db(weaviate_client, doc_ids=[doc['doc_id'] for doc in docs], index_name=index_name)
-
     vector_store = WeaviateVectorStore(weaviate_client=weaviate_client, index_name=index_name)
+
+    if vectordb_contains_any(reference, weaviate_client=weaviate_client, index_name=index_name) and overwrite:
+        filters = MetadataFilters(
+            filters=[MetadataFilter(key="reference", value=reference, operator=FilterOperator.EQ)],
+        )
+        vector_store.delete_nodes(filters=filters)
+
     embedding_model = OpenAIEmbedding(mode=retrieval_mode, model=embed_model, dimensions=dimensions)
     embed_model_context = ServiceContext.from_defaults(
         embed_model=embedding_model,
@@ -100,18 +100,13 @@ def create_vectordb_index(text_documents: List[Document], table_documents: List[
     return loaded_index
 
 
-def create_or_load_vectorstore_index(
-        paper: pd.Series,
-        llm_model="gpt-4o",
-        embed_model='text-embedding-3-small',
-        preprocessing_path='data/preprocessing/nougat/',
-        preprocessing_dataset: rg.FeedbackDataset = None,
-        reindex=False,
-        weaviate_client: Optional[WeaviateClient] = None,
-        index_name: Optional[str] = "LlamaIndexDocumentSections",
-        persist_dir='data/interim/vectorstore/',
-        **kwargs
-) -> VectorStoreIndex:
+def create_or_load_vectorstore_index(paper: pd.Series, llm_model="gpt-4o", embed_model='text-embedding-3-small',
+                                     preprocessing_path='data/preprocessing/nougat/',
+                                     preprocessing_dataset: rg.FeedbackDataset = None,
+                                     weaviate_client: Optional[WeaviateClient] = None,
+                                     index_name: Optional[str] = "LlamaIndexDocumentSections",
+                                     persist_dir='data/interim/vectorstore/', reindex=False,
+                                     **kwargs) -> VectorStoreIndex:
     """
     Creates or loads a VectorStoreIndex for a given paper.
 
@@ -163,7 +158,7 @@ def create_or_load_vectorstore_index(
     storage_context = get_storage_context(weaviate_client=weaviate_client,
                                           index_name=index_name,
                                           persist_dir=local_dir)
-    llm = OpenAI(model=llm_model, temperature=0.0, max_retries=3)
+    llm = OpenAI(model=llm_model, temperature=0.0, max_retries=3, streaming=True)
     service_context = ServiceContext.from_defaults(llm=llm)
 
     if not isinstance(storage_context.vector_store, SimpleVectorStore):

@@ -4,9 +4,12 @@ from uuid import UUID
 
 import pandas as pd
 from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langfuse.llama_index import LlamaIndexCallbackHandler
+from langfuse.utils.base_callback_handler import LangfuseBaseCallbackHandler
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+from minio import Minio
 from weaviate import WeaviateClient
 
 from extralit.convert.json_table import json_to_df
@@ -24,33 +27,60 @@ from extralit.server.models.segments import SegmentsResponse
 _LOGGER = logging.getLogger(__name__)
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://argilla-server"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+weaviate_client: WeaviateClient = None
+minio_client: Minio = None
+
+
+@app.on_event("startup")
+async def load_weaviate_client():
+    global weaviate_client
+    if weaviate_client is None:
+        weaviate_client = get_weaviate_client()
+
+
+@app.on_event("startup")
+async def load_minio_client():
+    global minio_client
+    if minio_client is None:
+        minio_client = get_minio_client()
+
 
 @app.get("/schemas/{workspace}")
-async def get_schemas(
+async def schemas(
         workspace: str = 'itn-recalibration',
-        minio_client=Depends(get_minio_client, use_cache=True),
 ):
     ss = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
     return ss.ordering
 
 
-@app.get("/chat/{reference}/{query}")
+@app.get("/chat/{reference}")
 async def chat(
         reference: str,
-        query: str,
+        query: str = Query(...),
+        workspace: str = Query(None),
+        similarity_top_k: int = Query(5),
         llm_model="gpt-3.5-turbo",
-        weaviate_client=Depends(get_weaviate_client, use_cache=True),
 ):
-    index = create_or_load_vectorstore_index(
-        paper=pd.Series(name=reference),
-        weaviate_client=weaviate_client,
-        llm_model=llm_model,
-        embed_model='text-embedding-3-small',
-        reindex=False,
-        index_name="LlamaIndexDocumentSections",
+    index = create_or_load_vectorstore_index(paper=pd.Series(name=reference), llm_model=llm_model,
+                                             embed_model='text-embedding-3-small', weaviate_client=weaviate_client,
+                                             index_name="LlamaIndexDocumentSections", reindex=False)
+
+    filters = MetadataFilters(
+        filters=[MetadataFilter(key="reference", value=reference, operator=FilterOperator.EQ)],
     )
 
     query_engine = index.as_query_engine(
+        similarity_top_k=similarity_top_k,
+        filters=filters,
+        response_mode="compact",
         streaming=True,
     )
 
@@ -58,19 +88,17 @@ async def chat(
     return StreamingResponse(response.response_gen, media_type="text/event-stream")
 
 
-@app.post("/completion", status_code=status.HTTP_201_CREATED,
+@app.post("/extraction", status_code=status.HTTP_201_CREATED,
           response_model=ExtractionResponse)
-async def completion(
+async def extraction(
         *,
         extraction_request: ExtractionRequest = Body(...),
         workspace: str = Query(...),
         model: str = "gpt-3.5-turbo",
         prompt_template: str = "default",
-        similarity_top_k=3,
+        similarity_top_k: int = 8,
         username: Optional[Union[str, UUID]] = None,
-        weaviate_client=Depends(get_weaviate_client, use_cache=True),
-        minio_client=Depends(get_minio_client, use_cache=True),
-        langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback, use_cache=True),
+        langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback),
 ):
     schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
     schema = schemas[extraction_request.schema_name]
@@ -105,13 +133,9 @@ async def completion(
 
     ### Create or load the index ###
     try:
-        index = create_or_load_vectorstore_index(
-            paper=pd.Series(name=extraction_request.reference),
-            weaviate_client=weaviate_client,
-            llm_model=model,
-            embed_model='text-embedding-3-small',
-            index_name="LlamaIndexDocumentSections",
-        )
+        index = create_or_load_vectorstore_index(paper=pd.Series(name=extraction_request.reference), llm_model=model,
+                                                 embed_model='text-embedding-3-small', weaviate_client=weaviate_client,
+                                                 index_name="LlamaIndexDocumentSections")
     except Exception as e:
         _LOGGER.error(f"Failed to create or load the index: {e}")
         raise HTTPException(status_code=500, detail=f'Failed to create an extraction request: {e}')
@@ -146,7 +170,7 @@ async def completion(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    if isinstance(langfuse_callback, LlamaIndexCallbackHandler):
+    if isinstance(langfuse_callback, LangfuseBaseCallbackHandler):
         langfuse_callback.flush()
 
     return response
@@ -160,7 +184,6 @@ async def segments(
         types: Optional[List[Literal['text', 'table', 'figure']]] = Query(None),
         username: Optional[Union[str, UUID]] = Query(None),
         limit=100,
-        weaviate_client: WeaviateClient = Depends(get_weaviate_client, use_cache=True),
 ):
     filters = []
 
@@ -173,4 +196,5 @@ async def segments(
         weaviate_client=weaviate_client, filters=MetadataFilters(filters=filters),
         limit=limit, index_name="LlamaIndexDocumentSections",
     )
+
     return SegmentsResponse(items=entries)

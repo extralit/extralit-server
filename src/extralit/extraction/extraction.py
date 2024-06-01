@@ -1,5 +1,4 @@
 import logging
-
 import os
 import warnings
 from os.path import join, exists
@@ -9,7 +8,6 @@ import pandas as pd
 import pandera as pa
 from langfuse.model import TextPromptClient
 from llama_index.core import VectorStoreIndex, PromptTemplate, Response
-from llama_index.core.prompts import default_prompts
 from llama_index.core.vector_stores import (
     MetadataFilter,
     MetadataFilters,
@@ -17,14 +15,14 @@ from llama_index.core.vector_stores import (
 from pydantic.v1 import BaseModel
 
 from extralit.extraction.models.paper import PaperExtraction
-from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.models.response import ResponseResult, ResponseResults
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.prompts import create_extraction_prompt, \
     create_completion_prompt, DEFAULT_SYSTEM_PROMPT_TMPL
 from extralit.extraction.schema import get_extraction_schema_model
+from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns
 from extralit.extraction.vector_index import create_or_load_vectorstore_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
-from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns, filter_unique_columns
 
 _LOGGER = logging.getLogger(__name__)
 
