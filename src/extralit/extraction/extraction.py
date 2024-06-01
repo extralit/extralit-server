@@ -18,10 +18,10 @@ from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.response import ResponseResult, ResponseResults
 from extralit.extraction.models.schema import SchemaStructure
 from extralit.extraction.prompts import create_extraction_prompt, \
-    create_completion_prompt, DEFAULT_SYSTEM_PROMPT_TMPL
+    create_completion_prompt, DEFAULT_EXTRACTION_PROMPT_TMPL
 from extralit.extraction.schema import get_extraction_schema_model
 from extralit.extraction.utils import convert_response_to_dataframe, generate_reference_columns
-from extralit.extraction.vector_index import create_or_load_vectorstore_index
+from extralit.extraction.vector_index import load_index
 from extralit.schema.references.assign import assign_unique_index, get_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def query_rag_index(
         similarity_top_k=20,
         filters: Optional[MetadataFilters] = None,
         response_mode="compact",
-        text_qa_template=DEFAULT_SYSTEM_PROMPT_TMPL,
+        text_qa_template=DEFAULT_EXTRACTION_PROMPT_TMPL,
         **kwargs,
 ) -> Response:
     warnings.filterwarnings('ignore', module='pydantic')
@@ -61,7 +61,7 @@ def extract_schema(
         headers: Optional[List[str]] = None,
         types: Optional[List[str]] = None,
         similarity_top_k=20,
-        system_prompt: Union[PromptTemplate, TextPromptClient]=DEFAULT_SYSTEM_PROMPT_TMPL,
+        system_prompt: Union[PromptTemplate, TextPromptClient] = DEFAULT_EXTRACTION_PROMPT_TMPL,
         user_prompt: Optional[str] = None,
         verbose=False,
         **kwargs,
@@ -116,7 +116,7 @@ def extract_schema(
     else:
         _LOGGER.warning(f"Invalid system_prompt type: {type(system_prompt)}, reverting to "
                         f"DATA_EXTRACTION_SYSTEM_PROMPT_TMPL.")
-        system_prompt = DEFAULT_SYSTEM_PROMPT_TMPL
+        system_prompt = DEFAULT_EXTRACTION_PROMPT_TMPL
 
     response = query_rag_index(
         prompt, index=index, output_cls=output_cls,
@@ -168,8 +168,7 @@ def extract_paper(
 
     ### Create or load the index ###
     if index is None:
-        index = create_or_load_vectorstore_index(paper, llm_model=llm_models[0], embed_model=embed_model,
-                                                 **(index_kwargs or {}))
+        index = load_index(paper, llm_model=llm_models[0], embed_model=embed_model, **(index_kwargs or {}))
     assert index.service_context.llm.model == llm_models[0], \
         f"LLM model mismatch: {index.service_context.llm.model} != {llm_models[0]}"
 

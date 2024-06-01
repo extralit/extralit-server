@@ -45,7 +45,8 @@ def get_nodes_metadata(weaviate_client: WeaviateClient,
     return entries
 
 
-def vectordb_contains_any(reference: str, weaviate_client: WeaviateClient, index_name: str) -> bool:
+def vectordb_contains_any(reference: str, weaviate_client: WeaviateClient,
+                          index_name: str = 'LlamaIndexDocumentSections') -> bool:
     if weaviate_client is None:
         return False
 

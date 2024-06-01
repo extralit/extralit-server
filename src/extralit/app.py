@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langfuse.llama_index import LlamaIndexCallbackHandler
 from langfuse.utils.base_callback_handler import LangfuseBaseCallbackHandler
+from llama_index.core.chat_engine.types import ChatMode
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 from minio import Minio
 from weaviate import WeaviateClient
@@ -16,8 +17,9 @@ from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
 from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
-from extralit.extraction.query import get_nodes_metadata
-from extralit.extraction.vector_index import create_or_load_vectorstore_index
+from extralit.extraction.prompts import DEFAULT_CHAT_PROMPT_TMPL
+from extralit.extraction.query import get_nodes_metadata, vectordb_contains_any
+from extralit.extraction.vector_index import load_index
 from extralit.server.context.files import get_minio_client
 from extralit.server.context.llamaindex import get_langfuse_callback
 from extralit.server.context.vectordb import get_weaviate_client
@@ -61,30 +63,48 @@ async def schemas(
     return ss.ordering
 
 
-@app.get("/chat/{reference}")
+@app.get("/chat/{workspace}")
 async def chat(
-        reference: str,
+        workspace: str,
         query: str = Query(...),
-        workspace: str = Query(None),
-        similarity_top_k: int = Query(5),
-        llm_model="gpt-3.5-turbo",
+        reference: str = Query(None),
+        similarity_top_k: int = Query(5, alias="k"),
+        chat_mode: ChatMode = Query(ChatMode.BEST),
+        llm_model: str = Query("gpt-3.5-turbo"),
+        username: Optional[Union[str, UUID]] = None,
+        langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback),
 ):
-    index = create_or_load_vectorstore_index(paper=pd.Series(name=reference), llm_model=llm_model,
-                                             embed_model='text-embedding-3-small', weaviate_client=weaviate_client,
-                                             index_name="LlamaIndexDocumentSections", reindex=False)
+    index = load_index(paper=pd.Series(name=reference), llm_model=llm_model, embed_model='text-embedding-3-small',
+                       weaviate_client=weaviate_client, index_name="LlamaIndexDocumentSections")
+
+    if not vectordb_contains_any(reference, weaviate_client, index_name="LlamaIndexDocumentSections"):
+        raise HTTPException(status_code=404, detail=f"No context found for reference: {reference}")
+
+    try:
+        if isinstance(langfuse_callback, LlamaIndexCallbackHandler):
+            langfuse_callback.set_trace_params(
+                name=f"chat-{reference}",
+                user_id=username,
+                session_id=reference,
+                tags=[workspace, reference, 'chat'],
+            )
+    except Exception as e:
+        _LOGGER.error(f"Failed to set trace params: {e}")
+
 
     filters = MetadataFilters(
         filters=[MetadataFilter(key="reference", value=reference, operator=FilterOperator.EQ)],
     )
 
-    query_engine = index.as_query_engine(
+    query_engine = index.as_chat_engine(
+        chat_mode=chat_mode,
         similarity_top_k=similarity_top_k,
         filters=filters,
-        response_mode="compact",
         streaming=True,
+        text_qa_template=DEFAULT_CHAT_PROMPT_TMPL,
     )
 
-    response = query_engine.query(query)
+    response = query_engine.stream_chat(query)
     return StreamingResponse(response.response_gen, media_type="text/event-stream")
 
 
@@ -133,9 +153,9 @@ async def extraction(
 
     ### Create or load the index ###
     try:
-        index = create_or_load_vectorstore_index(paper=pd.Series(name=extraction_request.reference), llm_model=model,
-                                                 embed_model='text-embedding-3-small', weaviate_client=weaviate_client,
-                                                 index_name="LlamaIndexDocumentSections")
+        index = load_index(paper=pd.Series(name=extraction_request.reference), llm_model=model,
+                           embed_model='text-embedding-3-small', weaviate_client=weaviate_client,
+                           index_name="LlamaIndexDocumentSections")
     except Exception as e:
         _LOGGER.error(f"Failed to create or load the index: {e}")
         raise HTTPException(status_code=500, detail=f'Failed to create an extraction request: {e}')

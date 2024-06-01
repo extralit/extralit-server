@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import pandera as pa
 from llama_index.core import PromptTemplate
-from llama_index.core.prompts import default_prompts
+from llama_index.core.prompts import chat_prompts
 
 from extralit.extraction.models import PaperExtraction
 from extralit.extraction.schema import get_extraction_schema_model, drop_type_def_from_schema_json
@@ -28,8 +28,9 @@ DATA_EXTRACTION_SYSTEM_PROMPT_TMPL = PromptTemplate(
     "Answer: "
 )
 
-# DEFAULT_SYSTEM_PROMPT_TMPL = PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL)
-DEFAULT_SYSTEM_PROMPT_TMPL = DATA_EXTRACTION_SYSTEM_PROMPT_TMPL
+# DEFAULT_EXTRACTION_PROMPT_TMPL = PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL)
+DEFAULT_CHAT_PROMPT_TMPL = chat_prompts.CHAT_TEXT_QA_PROMPT
+DEFAULT_EXTRACTION_PROMPT_TMPL = DATA_EXTRACTION_SYSTEM_PROMPT_TMPL
 
 
 DATA_EXTRACTION_COMPLETION_PROMPT_TMPL = PromptTemplate(
