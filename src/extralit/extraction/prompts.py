@@ -2,7 +2,8 @@ import json
 from typing import List, Optional
 
 import pandera as pa
-from llama_index.core import PromptTemplate
+from llama_index.core import PromptTemplate, ChatPromptTemplate
+from llama_index.core.base.llms.types import MessageRole, ChatMessage
 from llama_index.core.prompts import chat_prompts
 
 from extralit.extraction.models import PaperExtraction
@@ -29,18 +30,8 @@ DATA_EXTRACTION_SYSTEM_PROMPT_TMPL = PromptTemplate(
 )
 
 # DEFAULT_EXTRACTION_PROMPT_TMPL = PromptTemplate(default_prompts.DEFAULT_TEXT_QA_PROMPT_TMPL)
-DEFAULT_CHAT_PROMPT_TMPL = chat_prompts.CHAT_TEXT_QA_PROMPT
 DEFAULT_EXTRACTION_PROMPT_TMPL = DATA_EXTRACTION_SYSTEM_PROMPT_TMPL
 
-
-DATA_EXTRACTION_COMPLETION_PROMPT_TMPL = PromptTemplate(
-    "Your task is to extract data from a malaria research paper.\n"
-    "The {schema_name} details can be split across the provided context. Respond with details by looking at the whole context always.\n"
-    "If you don't find the information in the given context or you are not sure, "
-    "omit the key-value in your JSON response.\n"
-    "{dependencies_prompt}\n"
-    "{dependencies_data}\n"
-)
 
 def create_extraction_prompt(
         schema: pa.DataFrameSchema, extractions: PaperExtraction, filter_unique_cols=False) -> str:
@@ -104,4 +95,38 @@ def create_completion_prompt(
     return prompt
 
 
+CHAT_SYSTEM_PROMPT = (
+    "You are a research assistant helping the user perform data extraction from a research paper.\n"
+    "Always answer the query using the provided context information, "
+    "and not prior knowledge.\n"
+    "Some rules to follow:\n"
+    "1. Give a list of `header` from the context at the end of your answer to help the user identify the section in the paper.\n"
+    "2. If the information is not avilable or you are unsure, state that the information is unavailable.\n"
+)
 
+TEXT_QA_SYSTEM_PROMPT = ChatMessage(
+    content=(
+        "You are an expert Q&A system that is trusted around the world.\n"
+        "Always answer the query using the provided context information, "
+        "and not prior knowledge.\n"
+    ),
+    role=MessageRole.SYSTEM,
+)
+
+TEXT_QA_PROMPT_TMPL_MSGS = [
+    TEXT_QA_SYSTEM_PROMPT,
+    ChatMessage(
+        content=(
+            "Context information is below.\n"
+            "---------------------\n"
+            "{context_str}\n"
+            "---------------------\n"
+            "Given the context information and not prior knowledge, "
+            "answer the query. Always include your references using `header` from the context to help the user identify the section in the paper\n"
+            "Query: {query_str}\n"
+            "Answer: "
+        ),
+        role=MessageRole.USER,
+    ),
+]
+DEFAULT_CHAT_PROMPT_TMPL = ChatPromptTemplate(message_templates=chat_prompts.TEXT_QA_PROMPT_TMPL_MSGS)

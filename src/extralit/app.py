@@ -7,6 +7,7 @@ from fastapi import FastAPI, Depends, Body, Query, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langfuse.llama_index import LlamaIndexCallbackHandler
+from langfuse.model import ChatPromptClient
 from langfuse.utils.base_callback_handler import LangfuseBaseCallbackHandler
 from llama_index.core.chat_engine.types import ChatMode
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
@@ -17,7 +18,7 @@ from extralit.convert.json_table import json_to_df
 from extralit.extraction.extraction import extract_schema
 from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.schema import SchemaStructure
-from extralit.extraction.prompts import DEFAULT_CHAT_PROMPT_TMPL
+from extralit.extraction.prompts import DEFAULT_CHAT_PROMPT_TMPL, CHAT_SYSTEM_PROMPT
 from extralit.extraction.query import get_nodes_metadata, vectordb_contains_any
 from extralit.extraction.vector_index import load_index
 from extralit.server.context.files import get_minio_client
@@ -59,19 +60,20 @@ async def load_minio_client():
 async def schemas(
         workspace: str = 'itn-recalibration',
 ):
-    ss = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
+    ss = SchemaStructure.from_s3(workspace=workspace, minio_client=minio_client)
     return ss.ordering
 
 
-@app.get("/chat/{workspace}")
+@app.get("/chat")
 async def chat(
-        workspace: str,
         query: str = Query(...),
-        reference: str = Query(None),
+        workspace: str = Query(...),
+        reference: str = Query(...),
         similarity_top_k: int = Query(5, alias="k"),
         chat_mode: ChatMode = Query(ChatMode.BEST),
         llm_model: str = Query("gpt-3.5-turbo"),
         username: Optional[Union[str, UUID]] = None,
+        prompt_template: str = "chat",
         langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback),
 ):
     index = load_index(paper=pd.Series(name=reference), llm_model=llm_model, embed_model='text-embedding-3-small',
@@ -91,6 +93,13 @@ async def chat(
     except Exception as e:
         _LOGGER.error(f"Failed to set trace params: {e}")
 
+    # Get the system prompt
+    try:
+        chat_prompts: ChatPromptClient = langfuse_callback.langfuse.get_prompt(prompt_template, cache_ttl_seconds=3000)
+        system_prompt = chat_prompts.prompt[0]['content']
+    except Exception as e:
+        _LOGGER.error(f"Failed to get system prompt: {e}")
+        system_prompt = None
 
     filters = MetadataFilters(
         filters=[MetadataFilter(key="reference", value=reference, operator=FilterOperator.EQ)],
@@ -98,9 +107,11 @@ async def chat(
 
     query_engine = index.as_chat_engine(
         chat_mode=chat_mode,
+        vector_store_query_mode="hybrid",
+        alpha=0.25,
         similarity_top_k=similarity_top_k,
         filters=filters,
-        streaming=True,
+        system_prompt=system_prompt or CHAT_SYSTEM_PROMPT,
         text_qa_template=DEFAULT_CHAT_PROMPT_TMPL,
     )
 
@@ -115,12 +126,12 @@ async def extraction(
         extraction_request: ExtractionRequest = Body(...),
         workspace: str = Query(...),
         model: str = "gpt-3.5-turbo",
-        prompt_template: str = "default",
         similarity_top_k: int = 8,
         username: Optional[Union[str, UUID]] = None,
+        prompt_template: str = "completion",
         langfuse_callback: Optional[LlamaIndexCallbackHandler] = Depends(get_langfuse_callback),
 ):
-    schemas = SchemaStructure.from_s3(minio_client=minio_client, bucket_name=workspace)
+    schemas = SchemaStructure.from_s3(workspace=workspace, minio_client=minio_client)
     schema = schemas[extraction_request.schema_name]
 
     extraction_dfs = {}
@@ -137,7 +148,7 @@ async def extraction(
     try:
         system_prompt = langfuse_callback.langfuse.get_prompt(prompt_template, cache_ttl_seconds=3000)
     except Exception as e:
-        _LOGGER.error(f"Failed to set system prompt: {e}")
+        _LOGGER.error(f"Failed to get system prompt: {e}")
         system_prompt = None
 
     try:
@@ -165,19 +176,13 @@ async def extraction(
 
     try:
         ### Extract entities ###
-        df, rag_response = extract_schema(
-            schema=schema,
-            extractions=extractions,
-            index=index,
-            include_fields=extraction_request.columns,
-            headers=extraction_request.headers,
-            types=extraction_request.types,
-            similarity_top_k=similarity_top_k,
-            system_prompt=system_prompt,
-            user_prompt=extraction_request.prompt,
-        )
+        df, rag_response = extract_schema(schema=schema, extractions=extractions, index=index,
+                                          include_fields=extraction_request.columns, headers=extraction_request.headers,
+                                          types=extraction_request.types, similarity_top_k=similarity_top_k,
+                                          system_prompt=system_prompt, user_prompt=extraction_request.prompt,
+                                          vector_store_query_mode="hybrid")
 
-        if df.empty:
+        if not isinstance(df, pd.DataFrame) or df.empty:
             if rag_response.source_nodes is None or len(rag_response.source_nodes) == 0:
                 raise HTTPException(
                     status_code=404,

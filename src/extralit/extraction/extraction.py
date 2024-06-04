@@ -45,7 +45,7 @@ def query_rag_index(
         similarity_top_k=similarity_top_k,
         filters=filters,
         text_qa_template=text_qa_template,
-        **kwargs
+        **kwargs,
     )
 
     obs_response = query_engine.query(prompt)
@@ -79,6 +79,7 @@ def extract_schema(
         verbose (Optional[int]): The verbosity level. Defaults to None.
         **kwargs (Dict): Additional keyword arguments to pass to the `query_rag_llm` and `as_query_engine` function.
             text_qa_template (PromptTemplate): The text QA template to use. Defaults to the default text QA template.
+            vector_store_query_mode (str): The vector store query mode. Defaults to "hybrid".
 
     Returns:
         Tuple[pd.DataFrame, ResponseResult]: The extracted DataFrame and the ResponseResult.
@@ -206,8 +207,7 @@ def extract_schema_with_fallback(schema: pa.DataFrameSchema, extractions: PaperE
     for model in models:
         try:
             index.service_context.llm.model = model
-            df, responses[schema.name] = extract_schema(schema=schema, extractions=extractions, index=index,
-                                                        verbose=verbose, **kwargs)
+            df, responses[schema.name] = extract_schema(schema=schema, extractions=extractions, index=index, **kwargs)
             return df
         except Exception as e:
             _LOGGER.log(logging.WARNING, f"Error {schema.name} ({model}): {e}")

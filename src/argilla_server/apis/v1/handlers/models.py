@@ -2,11 +2,12 @@ import logging
 from urllib.parse import urljoin
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
 from argilla_server.models import User
+from argilla_server.policies import _exists_workspace_user_by_user_and_workspace_name
 from argilla_server.security import auth
 from argilla_server.settings import settings
 
@@ -23,6 +24,10 @@ async def proxy(request: Request, rest_of_path: str,
     params = dict(request.query_params)
     if current_user:
         params['username'] = current_user.username
+    if 'workspace' in params and current_user:
+        if not await _exists_workspace_user_by_user_and_workspace_name(current_user, params['workspace']):
+            raise HTTPException(status_code=500,
+                                detail=f"{current_user.username} is not authorized to access workspace {params['workspace']}")
 
     _LOGGER.info(f'PROXY {url} {params}')
 
@@ -44,7 +49,7 @@ async def proxy(request: Request, rest_of_path: str,
         response = await client.send(request, stream=True)
         async for chunk in response.aiter_raw():
             yield chunk
-        client.aclose()
+        await client.aclose()
 
     return StreamingResponse(stream_response(), media_type="text/event-stream")
     

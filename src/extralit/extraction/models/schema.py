@@ -47,14 +47,15 @@ class SchemaStructure(BaseModel):
         return cls(schemas=list(schemas.values()))
 
     @classmethod
-    def from_s3(cls, minio_client: Minio, bucket_name: str, prefix:str='schemas/', exclude: List[str] = []):
+    def from_s3(cls, workspace: str, minio_client: Minio, prefix: str = 'schemas/',
+                exclude: List[str] = []):
         schemas = {}
-        objects = minio_client.list_objects(bucket_name, prefix=prefix, include_version=False)
+        objects = minio_client.list_objects(workspace, prefix=prefix, include_version=False)
 
         for obj in objects:
             filepath = obj.object_name
             try:
-                data = minio_client.get_object(bucket_name, filepath)
+                data = minio_client.get_object(workspace, filepath)
                 file_data = BytesIO(data.read())
 
                 if filepath.endswith('.json'):

@@ -1,14 +1,15 @@
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Security
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Security
 from fastapi.responses import StreamingResponse
 from minio import Minio, S3Error
 
-from argilla_server.policies import FilePolicy, _exists_workspace_user_by_user_and_workspace_name, authorize
-from argilla_server.security import auth
-from argilla_server.models import User
 from argilla_server.contexts import files
+from argilla_server.models import User
+from argilla_server.policies import FilePolicy, authorize
 from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata
+from argilla_server.security import auth
 
 _LOGGER = logging.getLogger("files")
 
@@ -25,8 +26,8 @@ async def get_file(
     ):
 
     # Check if the current user is in the workspace to have access to the s3 bucket of the same name
-    # if current_user is not None:
-    #     await authorize(current_user, FilePolicy.get(bucket))
+    if current_user is not None:
+        await authorize(current_user, FilePolicy.get(bucket))
 
     try:
         file_response = files.get_object(client, bucket, object, version_id=version_id, include_versions=True)
