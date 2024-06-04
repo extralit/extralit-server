@@ -64,7 +64,7 @@ async def schemas(
     return ss.ordering
 
 
-@app.get("/chat")
+@app.get("/chat", status_code=status.HTTP_200_OK, response_class=StreamingResponse)
 async def chat(
         query: str = Query(...),
         workspace: str = Query(...),
@@ -119,8 +119,7 @@ async def chat(
     return StreamingResponse(response.response_gen, media_type="text/event-stream")
 
 
-@app.post("/extraction", status_code=status.HTTP_201_CREATED,
-          response_model=ExtractionResponse)
+@app.post("/extraction", status_code=status.HTTP_200_OK, response_model=ExtractionResponse)
 async def extraction(
         *,
         extraction_request: ExtractionRequest = Body(...),

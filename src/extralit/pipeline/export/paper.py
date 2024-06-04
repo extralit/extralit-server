@@ -68,31 +68,31 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
             fields['metadata'] = f'Paper: {ref}\n' + nav_df.to_markdown(index=True)
 
             # Retrieve most relevant context
-            if ref in responses and schema_name in responses[ref].items:
-                nodes_df = responses[ref].items[schema_name].get_nodes_info()
-                nodes_df.drop(columns=nodes_df.columns.difference(['relevance', 'header', 'page_number', 'text']),
-                              errors='ignore', inplace=True)
-                # nodes_df['page_number'] = nodes_df['page_number'].map(lambda x: f"[Page {x}](#page_number.{x})" if x else None)
-                fields['context'] = nodes_df \
-                    .style.background_gradient(axis=1, subset=['relevance'], cmap='RdYlGn') \
-                    .to_html(index=False, na_rep='')
-
-                headers = responses[ref].get_ranked_nodes(schema_name, include_all_nodes=True)['header'].tolist()
-            else:
-                headers = []
-
-            ### suggestions ###
-            suggestions = [
-                {
-                    "question_name": "context-relevant",
-                    "value": headers,
-                    "type": "selection",
-                },
-            ]
+            # if ref in responses and schema_name in responses[ref].items:
+            #     nodes_df = responses[ref].items[schema_name].get_nodes_info()
+            #     nodes_df.drop(columns=nodes_df.columns.difference(['relevance', 'header', 'page_number', 'text']),
+            #                   errors='ignore', inplace=True)
+            #     # nodes_df['page_number'] = nodes_df['page_number'].map(lambda x: f"[Page {x}](#page_number.{x})" if x else None)
+            #     fields['context'] = nodes_df \
+            #         .style.background_gradient(axis=1, subset=['relevance'], cmap='RdYlGn') \
+            #         .to_html(index=False, na_rep='')
+            #
+            #     headers = responses[ref].get_ranked_nodes(schema_name, include_all_nodes=True)['header'].tolist()
+            # else:
+            #     headers = []
+            #
+            # ### suggestions ###
+            # suggestions = [
+            #     {
+            #         "question_name": "context-relevant",
+            #         "value": headers,
+            #         "type": "selection",
+            #     },
+            # ]
 
             record = rg.FeedbackRecord(
                 fields=fields,
-                suggestions=suggestions if len(headers) else [],
+                # suggestions=suggestions if len(headers) else [],
                 metadata={**metadata, 'type': schema_name, },
             )
             records.append(record)
