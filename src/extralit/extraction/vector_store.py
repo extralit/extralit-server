@@ -130,16 +130,16 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
     ) -> None:
         collection = self._client.collections.get(self.index_name)
 
-        if filters is not None:
-            filters = _to_weaviate_filter(filters)
-
-        # list of documents to constrain search
         if node_ids is not None:
             filters = wvc.query.Filter.by_property("id").contains_any(node_ids)
+        elif filters is not None:
+            filters = _to_weaviate_filter(filters)
+        else:
+            raise ValueError("Either node_ids or filters must be provided")
 
-        results = collection.delete_objects(filters=filters, **delete_kwargs)
-        print(f"Deleted {results['results']['successful']} nodes")
-        _LOGGER.debug(f"Deleted {results['results']['successful']} nodes")
+        results = collection.data.delete_many(where=filters, verbose=True)
+        print(f"Deleted nodes", results.objects)
+        _LOGGER.debug(f"Deleted {len(results.objects)} nodes")
 
     def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """Query index for top k most similar nodes."""

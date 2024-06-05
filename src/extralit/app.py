@@ -119,12 +119,12 @@ async def chat(
     return StreamingResponse(response.response_gen, media_type="text/event-stream")
 
 
-@app.post("/extraction", status_code=status.HTTP_200_OK, response_model=ExtractionResponse)
+@app.post("/extraction", status_code=status.HTTP_201_CREATED, response_model=ExtractionResponse)
 async def extraction(
         *,
         extraction_request: ExtractionRequest = Body(...),
         workspace: str = Query(...),
-        model: str = "gpt-3.5-turbo",
+        model: str = "gpt-4o",
         similarity_top_k: int = 8,
         username: Optional[Union[str, UUID]] = None,
         prompt_template: str = "completion",
@@ -199,8 +199,8 @@ async def extraction(
 
     return response
 
-@app.get("/segments/", status_code=status.HTTP_201_CREATED,
-          response_model=SegmentsResponse)
+
+@app.get("/segments/", status_code=status.HTTP_200_OK, response_model=SegmentsResponse)
 async def segments(
         *,
         workspace: str = Query(...),
