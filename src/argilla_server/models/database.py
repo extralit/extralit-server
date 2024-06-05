@@ -113,7 +113,7 @@ class Suggestion(DatabaseModel):
     __tablename__ = "suggestions"
 
     value: Mapped[Any] = mapped_column(JSON)
-    score: Mapped[Optional[float]] = mapped_column(nullable=True)
+    score: Mapped[Optional[Union[float, List[float]]]] = mapped_column(JSON, nullable=True)
     agent: Mapped[Optional[str]] = mapped_column(nullable=True)
     type: Mapped[Optional[SuggestionType]] = mapped_column(SuggestionTypeEnum, nullable=True, index=True)
     record_id: Mapped[UUID] = mapped_column(ForeignKey("records.id", ondelete="CASCADE"), index=True)
@@ -353,6 +353,26 @@ class Dataset(DatabaseModel):
     def is_ready(self):
         return self.status == DatasetStatus.ready
 
+    def metadata_property_by_name(self, name: str) -> Union["MetadataProperty", None]:
+        for metadata_property in self.metadata_properties:
+            if metadata_property.name == name:
+                return metadata_property
+
+    def question_by_id(self, question_id: UUID) -> Union[Question, None]:
+        for question in self.questions:
+            if question.id == question_id:
+                return question
+
+    def question_by_name(self, name: str) -> Union["Question", None]:
+        for question in self.questions:
+            if question.name == name:
+                return question
+
+    def vector_settings_by_name(self, name: str) -> Union["VectorSettings", None]:
+        for vector_settings in self.vectors_settings:
+            if vector_settings.name == name:
+                return vector_settings
+
     def __repr__(self):
         return (
             f"Dataset(id={str(self.id)!r}, name={self.name!r}, guidelines={self.guidelines!r}, "
@@ -455,13 +475,14 @@ class Document(DatabaseModel):
 
     url: Mapped[str] = mapped_column(String, nullable=True)
     file_name: Mapped[str] = mapped_column(String, nullable=False)
+    reference: Mapped[str] = mapped_column(String, index=True, nullable=True)
     pmid: Mapped[str] = mapped_column(String, index=True, nullable=True)
     doi: Mapped[str] = mapped_column(String, index=True, nullable=True)
     workspace_id: Mapped[UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
 
     def __repr__(self):
         return (
-            f"Document(id={str(self.id)!r}, workspace_id={str(self.workspace_id)!r},"
+            f"Document(id={str(self.id)!r}, workspace_id={str(self.workspace_id)!r}, reference={self.reference!r},"
             f"pmid={self.pmid!r}, doi={self.doi!r}, file_name={self.file_name!r}, url={self.url!r})"
         )
     

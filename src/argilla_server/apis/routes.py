@@ -35,12 +35,14 @@ from argilla_server.apis.v0.handlers import (
     users,
     workspaces,
 )
+from argilla_server.apis.v1.handlers import authentication as authentication_v1
 from argilla_server.apis.v1.handlers import (
     datasets as datasets_v1,
 )
 from argilla_server.apis.v1.handlers import (
     fields as fields_v1,
 )
+from argilla_server.apis.v1.handlers import info as info_v1
 from argilla_server.apis.v1.handlers import (
     metadata_properties as metadata_properties_v1,
 )
@@ -56,6 +58,7 @@ from argilla_server.apis.v1.handlers import (
 from argilla_server.apis.v1.handlers import (
     responses as responses_v1,
 )
+from argilla_server.apis.v1.handlers import settings as settings_v1
 from argilla_server.apis.v1.handlers import (
     suggestions as suggestions_v1,
 )
@@ -121,6 +124,8 @@ def create_api_v1():
     APIErrorHandler.configure_app(api_v1)
 
     for router in [
+        info_v1.router,
+        authentication_v1.router,
         datasets_v1.router,
         fields_v1.router,
         questions_v1.router,
@@ -132,6 +137,7 @@ def create_api_v1():
         vectors_settings_v1.router,
         workspaces_v1.router,
         oauth2_v1.router,
+        settings_v1.router,
         documents_v1.router,
         files_v1.router,
         models_v1.router,

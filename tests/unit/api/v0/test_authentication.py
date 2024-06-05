@@ -21,12 +21,12 @@ from tests.factories import UserFactory
 
 @pytest.mark.asyncio
 class TestsAuthentication:
-    async def authenticate(self, async_client: AsyncClient):
+    async def test_authenticate(self, async_client: AsyncClient):
         user = await UserFactory.create()
 
         response = await async_client.post(
             "/api/security/token",
-            data={"username": user.username, "password": "12345678"},
+            data={"username": user.username, "password": "1234"},
         )
         assert response.status_code == 200
         assert response.json()["access_token"]
