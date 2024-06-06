@@ -46,10 +46,10 @@ def list_objects(client: Minio, bucket: str, prefix: Optional[str] = None, inclu
         return ListObjectsResponse(objects=objects)
     
     except S3Error as se:
-        _LOGGER.error(f"Error listing objects in '{bucket}/{prefix}': {se}", stack_info=True)
+        _LOGGER.error(f"Error listing objects in '{bucket}/{prefix}': {se}")
         raise HTTPException(status_code=404, detail=f"Cannot list objects with '{bucket}/{prefix}' not found")
     except Exception as e:
-        _LOGGER.error(f"Error listing objects in bucket '{bucket}/{prefix}': {e}", stack_info=True)
+        _LOGGER.error(f"Error listing objects in bucket '{bucket}/{prefix}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     
 
@@ -57,7 +57,18 @@ def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str
                include_versions=False) -> FileObjectResponse:
     try:
         stat = client.stat_object(bucket, object, version_id=version_id)
-        print('stat', stat)
+    except S3Error as se:
+        if version_id:
+            _LOGGER.warn(f"Error getting object {object} from bucket {bucket} with version {version_id}: {se}")
+            try:
+                _LOGGER.info(f"Retrying without version_id for object {object} in bucket {bucket}")
+                stat = client.stat_object(bucket, object)
+            except S3Error as se_retry:
+                raise se_retry
+        else:
+            raise se
+
+    try:
         obj = client.get_object(bucket, object, version_id=stat.version_id)
 
         if include_versions:
@@ -68,10 +79,10 @@ def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str
         return FileObjectResponse(response=obj, metadata=stat, versions=versions)
     
     except S3Error as se:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}", stack_info=True)
+        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {se}")
         raise HTTPException(status_code=404, detail=f"Object {object} not found in bucket {bucket}")
     except Exception as e:
-        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {e}", stack_info=True)
+        _LOGGER.error(f"Error getting object {object} from bucket {bucket}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     
 
