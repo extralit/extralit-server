@@ -57,6 +57,7 @@ def get_object(client: Minio, bucket: str, object: str, version_id: Optional[str
                include_versions=False) -> FileObjectResponse:
     try:
         stat = client.stat_object(bucket, object, version_id=version_id)
+        print('stat', stat)
         obj = client.get_object(bucket, object, version_id=stat.version_id)
 
         if include_versions:

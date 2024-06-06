@@ -94,6 +94,7 @@ async def upload_document(
     
     new_document = Document(
         id=document_create.id,
+        reference=document_create.reference,
         pmid=document_create.pmid, 
         doi=document_create.doi,
         url=document_create.url,
