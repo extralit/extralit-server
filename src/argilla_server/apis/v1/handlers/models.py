@@ -19,16 +19,19 @@ router = APIRouter(tags=["models"])
                   methods=["GET", "POST", "PUT", "DELETE"], 
                   response_class=StreamingResponse)
 async def proxy(request: Request, rest_of_path: str,
-                current_user: User = Depends(auth.get_optional_current_user)):
+                current_user: User = Depends(auth.get_current_user)):
     url = urljoin(settings.extralit_url, rest_of_path)
     params = dict(request.query_params)
 
     _LOGGER.info(f'PROXY {url} {params}, {current_user}')
 
+    if 'workspace' not in params or not params['workspace']:
+        raise HTTPException(status_code=500, detail="`workspace` is required in query parameters")
+
     if current_user:
         params['username'] = current_user.username
-        
-        if 'workspace' in params and current_user.role != "owner":
+
+        if current_user.role != "owner":
             if not await _exists_workspace_user_by_user_and_workspace_name(current_user, params['workspace']):
                 raise HTTPException(status_code=500,
                                     detail=f"{current_user.username} is not authorized to access workspace {params['workspace']}")
