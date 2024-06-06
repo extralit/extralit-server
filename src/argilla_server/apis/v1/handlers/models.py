@@ -36,7 +36,7 @@ async def proxy(request: Request, rest_of_path: str,
                 raise HTTPException(status_code=500,
                                     detail=f"{current_user.username} is not authorized to access workspace {params['workspace']}")
 
-    client = httpx.AsyncClient(timeout=60.0)
+    client = httpx.AsyncClient(timeout=10.0)
     if request.method == "GET":
         request = client.build_request("GET", url, params=params)
     elif request.method == "POST":
