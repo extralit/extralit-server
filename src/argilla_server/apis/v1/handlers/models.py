@@ -22,14 +22,16 @@ async def proxy(request: Request, rest_of_path: str,
                 current_user: User = Depends(auth.get_optional_current_user)):
     url = urljoin(settings.extralit_url, rest_of_path)
     params = dict(request.query_params)
+
+    _LOGGER.info(f'PROXY {url} {params}, {current_user}')
+
     if current_user:
         params['username'] = current_user.username
-    if 'workspace' in params and current_user:
-        if not await _exists_workspace_user_by_user_and_workspace_name(current_user, params['workspace']):
-            raise HTTPException(status_code=500,
-                                detail=f"{current_user.username} is not authorized to access workspace {params['workspace']}")
-
-    _LOGGER.info(f'PROXY {url} {params}')
+        
+        if 'workspace' in params and current_user.role != "owner":
+            if not await _exists_workspace_user_by_user_and_workspace_name(current_user, params['workspace']):
+                raise HTTPException(status_code=500,
+                                    detail=f"{current_user.username} is not authorized to access workspace {params['workspace']}")
 
     client = httpx.AsyncClient(timeout=60.0)
     if request.method == "GET":
