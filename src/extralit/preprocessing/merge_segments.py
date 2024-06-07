@@ -203,8 +203,8 @@ def merge_extractions(**extraction_sources: Dict[str, Segments]) -> Alignments:
         if not valid_items: break
 
         current_page_number = valid_items[0][1].page_number
-        filtered_items = [(source, segment) for source, segment, *number in valid_items \
-                          if segment.page_number == current_page_number]
+        filtered_items: List[Tuple[str, TextSegment]] = [(source, segment) for source, segment, *number in valid_items \
+                                                         if segment.page_number == current_page_number]
 
         # Combine headers for unique values
         unique_headers = set(segment.header.strip() for (source, segment) in filtered_items if segment.header)
@@ -226,7 +226,7 @@ def merge_extractions(**extraction_sources: Dict[str, Segments]) -> Alignments:
             number=number,
             extractions={source: segment for source, segment in filtered_items},
             image=image,
-            type=type(filtered_items[0][1]).__name__,
+            type=filtered_items[0][1].type,
             probability=max(probabilities, default=None),
         )
         merged_data.append(segment_alignment)

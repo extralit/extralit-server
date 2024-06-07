@@ -38,7 +38,7 @@ def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
         if field in record.fields:
             data[field] = record.fields[field]
 
-    selected_response = next((r for r in responses[::-1]), None)
+    selected_response = next((r for r in responses[::-1] if r.values), None)
     for answer in answers:
         if selected_response and answer in selected_response.values:
             data[answer] = selected_response.values[answer].value
@@ -58,7 +58,7 @@ def get_record_table(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
                      field='extraction',
                      answer='extraction-correction',
                      users: Optional[Union[List[rg.User], rg.User]] = None,
-                     skip_status=["discarded"]) -> Optional[str]:
+                     skip_status: List[str] = ["discarded"]) -> Optional[str]:
     value = None
     outputs = get_record_data(record,
                               fields=field,

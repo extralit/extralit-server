@@ -13,12 +13,12 @@ from llama_index.core.storage import StorageContext
 from llama_index.core.vector_stores import SimpleVectorStore, MetadataFilters, MetadataFilter, FilterOperator
 from llama_index.embeddings.openai import OpenAIEmbeddingMode, OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from extralit.extraction.vector_store import WeaviateVectorStore
 from weaviate import WeaviateClient
 
-from extralit.extraction.chunking import create_documents
+from extralit.extraction.chunking import create_nodes
 from extralit.extraction.query import vectordb_contains_any
 from extralit.extraction.storage import get_storage_context
+from extralit.extraction.vector_store import WeaviateVectorStore
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def create_local_index(paper: pd.Series,
                        chunk_overlap=200,
                        verbose=True, ) \
         -> VectorStoreIndex:
-    text_documents, table_documents = create_documents(
+    text_documents, table_documents = create_nodes(
         paper, preprocessing_path=preprocessing_path,
         preprocessing_dataset=preprocessing_dataset)
 
@@ -87,7 +87,7 @@ def create_vector_index(paper: pd.Series,
                         chunk_overlap=200,
                         verbose=True, ) \
         -> VectorStoreIndex:
-    text_documents, table_documents = create_documents(
+    text_documents, table_documents = create_nodes(
         paper, preprocessing_path=preprocessing_path,
         preprocessing_dataset=preprocessing_dataset)
 

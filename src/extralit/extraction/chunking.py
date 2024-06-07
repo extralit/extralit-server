@@ -15,7 +15,7 @@ INCLUDE_METADATA_KEYS = {'header': True, 'footer': True, 'level': True, 'page_nu
 EXCLUDE_LLM_METADATA_KEYS = ['type', 'page_number', 'reference', 'level']
 
 
-def create_documents(
+def create_nodes(
         paper: pd.Series,
         preprocessing_path='data/preprocessing/nougat/',
         preprocessing_dataset: Optional[rg.FeedbackDataset] = None,
@@ -35,7 +35,7 @@ def create_documents(
             The response status of the records to consider.
         preprocessing_path: str, default='data/preprocessing/nougat/'
             Path to the preprocessed data.
-        ignore_metad    ata: set, default={'text', 'type', 'level', 'children', 'coordinates', 'source', 'html', 'original',
+        ignore_metadata: set, default={'text', 'type', 'level', 'children', 'coordinates', 'source', 'html', 'original',
                                        'probability', 'image'}
             Metadata to exclude from the documents.
         nougat_kwargs: dict
@@ -56,13 +56,13 @@ def create_documents(
         table_segments = Segments.parse_file(tables_path) if exists(tables_path) else Segments()
 
     extra_metadata = {'reference': reference}
-    text_documents = create_text_nodes(
+    text_nodes = create_text_nodes(
         text_segments, extra_metadata=extra_metadata, exclude_llm_metadata_keys=exclude_llm_metadata_keys)
 
-    table_documents = create_table_nodes(
+    table_nodes = create_table_nodes(
         table_segments, extra_metadata=extra_metadata, exclude_llm_metadata_keys=exclude_llm_metadata_keys)
 
-    return text_documents, table_documents
+    return text_nodes, table_nodes
 
 
 def create_text_nodes(text_segments: Segments, extra_metadata: Optional[Dict[str, Any]],
