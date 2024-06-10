@@ -20,6 +20,7 @@ class PaperExtraction(BaseModel):
     schemas: SchemaStructure = Field(..., description="The schema structure of the extraction.")
     durations: Dict[str, Optional[float]] = Field(default_factory=dict)
     updated_at: Dict[str, Optional[datetime]] = Field(default_factory=dict)
+    inserted_at: Dict[str, Optional[datetime]] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True

@@ -112,6 +112,7 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
     extractions = {}
     durations = {}
     updated_at = {}
+    inserted_at = {}
     for record in records:
         if record.metadata['reference'] != reference:
             continue
@@ -135,9 +136,9 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
             if schema.name == record.metadata['type']:
                 extractions[schema.name] = json_to_df(table_json, schema=schema)
                 durations[schema.name] = outputs.get('duration', None)
-
-            updated_at[schema.name] = record.inserted_at
+                updated_at[schema.name] = max([res.updated_at for res in record.responses], default=record.updated_at)
+                inserted_at[schema.name] = record.inserted_at
 
     return PaperExtraction(reference=reference, extractions=extractions, schemas=schemas,
-                           durations=durations, updated_at=updated_at)
+                           durations=durations, updated_at=updated_at, inserted_at=inserted_at)
 

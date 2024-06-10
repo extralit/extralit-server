@@ -13,6 +13,7 @@ from extralit.extraction.models.paper import PaperExtraction
 from extralit.extraction.models.response import ResponseResults
 _LOGGER = logging.getLogger(__name__)
 
+
 def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
                               responses: Dict[str, ResponseResults],
                               papers: pd.DataFrame,
@@ -29,7 +30,7 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
             assert isinstance(dataset, RemoteFeedbackDataset)
             if isinstance(paper.file_path, str):
                 doc = dataset.add_document(
-                    rg.Document.from_file(paper.file_path, pmid=paper.pmid, doi=paper.doi,
+                    rg.Document.from_file(paper.file_path, reference=ref, pmid=paper.pmid, doi=paper.doi,
                                           id=paper.get('id')))
             else:
                 raise Exception(f'Unable to load document for {ref}')
@@ -119,7 +120,7 @@ def create_publication_records(
             assert isinstance(dataset, RemoteFeedbackDataset)
             if isinstance(paper.file_path, str):
                 doc = dataset.add_document(
-                    rg.Document.from_file(paper.file_path, pmid=paper.pmid, doi=paper.doi,
+                    rg.Document.from_file(paper.file_path, reference=ref, pmid=paper.pmid, doi=paper.doi,
                                           id=paper.id if hasattr(paper, 'id') else None))
             else:
                 raise Exception(f'Unable to load document for {paper.name}')

@@ -93,7 +93,7 @@ class Segments(BaseModel):
 
     @property
     def duration(self):
-        return sum([item.duration or 0 for item in self.items])
+        return sum([item.duration or 0 for item in self.items if item.duration and item.duration < 1000])
 
     def __getitem__(self, index):
         return self.items[index]

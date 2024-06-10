@@ -27,8 +27,10 @@ def get_langfuse_traces(
         max_page = traces_batch.meta.total_pages
 
         for trace in traces_batch.data:
+            if trace is None or not trace.metadata: continue
+            trace_metadata: dict = trace.metadata.get('metadata', {}) or {}
             if references and not next((metadata.get('reference') in references \
-                                        for metadata in trace.metadata.get('metadata', {}).values()), None):
+                                        for metadata in trace_metadata.values()), None):
                 continue
             if input_match and not re.search(input_match, trace.input): continue
             # if schema_names and not next((metadata.get('schema') in schema_names for metadata in trace.metadata.values()), None):
