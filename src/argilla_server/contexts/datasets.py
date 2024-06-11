@@ -33,7 +33,7 @@ from uuid import UUID
 
 import sqlalchemy
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import Select, and_, case, func, select
+from sqlalchemy import Select, and_, or_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
@@ -390,7 +390,7 @@ async def get_record_by_id(
 
     if record and with_responses:
         record.responses = [response for response in record.responses \
-                            if response.status == ResponseStatus.submitted]
+                            if response.status in [ResponseStatus.submitted, ResponseStatus.discarded]]
 
     return record
 
@@ -412,12 +412,26 @@ async def get_records_by_ids(
     if include and include.with_responses:
         if not user_id:
             query = query.options(joinedload(Record.responses))
+        elif include.with_response_suggestions:
+            query = query.outerjoin(
+                Response, 
+                and_(
+                    Response.record_id == Record.id,
+                    or_(
+                        Response.user_id == user_id,
+                        and_(
+                            Response.user_id != user_id,
+                            Response.status.in_([ResponseStatus.submitted, ResponseStatus.discarded])
+                        )
+                    )
+                )
+            ).options(contains_eager(Record.responses)).order_by(case((Response.user_id == user_id, 0), else_=1))
         else:
             query = query.outerjoin(
                 Response, and_(Response.record_id == Record.id, Response.user_id == user_id)
             ).options(contains_eager(Record.responses))
 
-    query = await _configure_query_relationships(query=query, dataset_id=dataset_id, include_params=include, user_id=user_id)
+    query = await _configure_query_relationships(query=query, dataset_id=dataset_id, include_params=include)
 
     result = await db.execute(query)
     records = result.unique().scalars().all()
@@ -430,16 +444,10 @@ async def get_records_by_ids(
 
 
 async def _configure_query_relationships(
-    query: "Select", dataset_id: UUID, include_params: Optional["RecordIncludeParam"] = None, user_id: Optional[UUID] = None
+    query: "Select", dataset_id: UUID, include_params: Optional["RecordIncludeParam"] = None
 ) -> "Select":
     if not include_params:
         return query
-    
-    if include_params.with_response_suggestions and user_id:
-        query = query.outerjoin(
-            Response, and_(Response.record_id == Record.id, Response.user_id != user_id, 
-                           Response.status in {ResponseStatus.submitted, ResponseStatus.discarded})
-        )
 
     if include_params.with_suggestions:
         query = query.options(joinedload(Record.suggestions))

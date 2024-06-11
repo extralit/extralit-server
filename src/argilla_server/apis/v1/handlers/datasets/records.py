@@ -16,6 +16,7 @@ import re
 from typing import Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
+from argilla_server.apis.v1.handlers.workspaces import list_workspace_users
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
@@ -27,7 +28,7 @@ from argilla_server.contexts import datasets, search
 from argilla_server.database import get_async_db
 from argilla_server.enums import MetadataPropertyType, RecordSortField, ResponseStatusFilter, SortOrder
 from argilla_server.models import Dataset as DatasetModel
-from argilla_server.models import Record, User
+from argilla_server.models import Record, User, Suggestion
 from argilla_server.policies import DatasetPolicyV1, authorize
 from argilla_server.schemas.v1.datasets import Dataset
 from argilla_server.schemas.v1.records import (
@@ -409,7 +410,7 @@ async def list_current_user_dataset_records(
     limit: int = Query(default=LIST_DATASET_RECORDS_LIMIT_DEFAULT, ge=1, le=LIST_DATASET_RECORDS_LIMIT_LE),
     current_user: User = Security(auth.get_current_user),
 ):
-    dataset = await _get_dataset_or_raise(db, dataset_id)
+    dataset = await _get_dataset_or_raise(db, dataset_id, with_questions=True)
 
     await authorize(current_user, DatasetPolicyV1.get(dataset))
 
@@ -425,6 +426,32 @@ async def list_current_user_dataset_records(
         include=include,
         sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
     )
+
+    if include and include.with_response_suggestions:
+        users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
+        user_id_to_name = {user.id: user.username for user in users.items}
+        
+        for record in records:
+            suggestion_responses = [response for response in record.responses \
+                                    if response.user_id != current_user.id]
+
+            for response in suggestion_responses:
+                for question_name, value in response.values.items():
+                    if not dataset.question_by_name(question_name): continue
+                    suggestion = {
+                        "question_id": dataset.question_by_name(question_name).id,
+                        "type": "human",
+                        "value": value,
+                        "agent": user_id_to_name.get(response.user_id),
+                        "score": None,
+                        "id": response.id,
+                        "inserted_at": response.inserted_at,
+                        "updated_at": response.updated_at
+                    }
+                    record.suggestions.append(Suggestion(**suggestion))
+
+            record.responses = [response for response in record.responses \
+                                if response.user_id == current_user.id]
 
     return Records(items=records, total=total)
 
