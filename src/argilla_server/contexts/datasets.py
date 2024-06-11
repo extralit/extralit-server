@@ -401,6 +401,7 @@ async def get_records_by_ids(
     dataset_id: Optional[UUID] = None,
     include: Optional["RecordIncludeParam"] = None,
     user_id: Optional[UUID] = None,
+    workspace_user_ids: Optional[Iterable[UUID]] = None,
 ) -> List[Union[Record, None]]:
     query = select(Record)
 
@@ -412,7 +413,7 @@ async def get_records_by_ids(
     if include and include.with_responses:
         if not user_id:
             query = query.options(joinedload(Record.responses))
-        elif include.with_response_suggestions:
+        elif include.with_response_suggestions and workspace_user_ids:
             query = query.outerjoin(
                 Response, 
                 and_(
@@ -420,7 +421,7 @@ async def get_records_by_ids(
                     or_(
                         Response.user_id == user_id,
                         and_(
-                            Response.user_id != user_id,
+                            Response.user_id.in_(workspace_user_ids),
                             Response.status.in_([ResponseStatus.submitted, ResponseStatus.discarded])
                         )
                     )

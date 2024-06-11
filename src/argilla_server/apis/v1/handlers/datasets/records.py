@@ -26,7 +26,7 @@ import argilla_server.search_engine as search_engine
 from argilla_server.apis.v1.handlers.datasets.datasets import _get_dataset_or_raise
 from argilla_server.contexts import datasets, search
 from argilla_server.database import get_async_db
-from argilla_server.enums import MetadataPropertyType, RecordSortField, ResponseStatusFilter, SortOrder
+from argilla_server.enums import MetadataPropertyType, RecordSortField, ResponseStatus, ResponseStatusFilter, SortOrder
 from argilla_server.models import Dataset as DatasetModel
 from argilla_server.models import Record, User, Suggestion
 from argilla_server.policies import DatasetPolicyV1, authorize
@@ -117,6 +117,7 @@ async def _filter_records_using_search_engine(
     response_statuses: Optional[List[ResponseStatusFilter]] = None,
     include: Optional[RecordIncludeParam] = None,
     sort_by_query_param: Optional[Dict[str, str]] = None,
+    workspace_user_ids: Optional[List[UUID]] = None,
 ) -> Tuple[List["Record"], int]:
     search_responses = await _get_search_responses(
         db=db,
@@ -135,7 +136,7 @@ async def _filter_records_using_search_engine(
 
     return (
         await datasets.get_records_by_ids(
-            db=db, dataset_id=dataset.id, user_id=user_id, records_ids=record_ids, include=include
+            db=db, dataset_id=dataset.id, user_id=user_id, records_ids=record_ids, include=include, workspace_user_ids=workspace_user_ids
         ),
         search_responses.total,
     )
@@ -411,6 +412,7 @@ async def list_current_user_dataset_records(
     current_user: User = Security(auth.get_current_user),
 ):
     dataset = await _get_dataset_or_raise(db, dataset_id, with_questions=True)
+    workspace_users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
 
     await authorize(current_user, DatasetPolicyV1.get(dataset))
 
@@ -425,30 +427,34 @@ async def list_current_user_dataset_records(
         response_statuses=response_statuses,
         include=include,
         sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
+        workspace_user_ids=[user.id for user in workspace_users.items],
     )
 
     if include and include.with_response_suggestions:
-        users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
-        user_id_to_name = {user.id: user.username for user in users.items}
+        user_id2name = {user.id: user.username for user in workspace_users.items}
+        question_name2id = {question.name: question.id for question in dataset.questions}
         
         for record in records:
             suggestion_responses = [response for response in record.responses \
                                     if response.user_id != current_user.id]
 
             for response in suggestion_responses:
+                if response.status == ResponseStatus.discarded: continue
+
                 for question_name, value in response.values.items():
-                    if not dataset.question_by_name(question_name): continue
-                    suggestion = {
-                        "question_id": dataset.question_by_name(question_name).id,
-                        "type": "human",
-                        "value": value,
-                        "agent": user_id_to_name.get(response.user_id),
-                        "score": None,
-                        "id": response.id,
-                        "inserted_at": response.inserted_at,
-                        "updated_at": response.updated_at
-                    }
-                    record.suggestions.append(Suggestion(**suggestion))
+                    if question_name not in question_name2id or not value: continue
+
+                    suggestion = Suggestion(
+                        id=response.id,
+                        question_id=question_name2id.get(question_name),
+                        type="human",
+                        value=value,
+                        agent=user_id2name.get(response.user_id),
+                        score=None,
+                        inserted_at=response.inserted_at,
+                        updated_at=response.updated_at
+                    )
+                    record.suggestions.append(suggestion)
 
             record.responses = [response for response in record.responses \
                                 if response.user_id == current_user.id]
