@@ -181,6 +181,10 @@ class RecordIncludeParam(BaseModel):
     @property
     def with_suggestions(self) -> bool:
         return self._has_relationships and RecordInclude.suggestions in self.relationships
+    
+    @property
+    def with_response_suggestions(self) -> bool:
+        return self._has_relationships and RecordInclude.response_suggestions in self.relationships
 
     @property
     def with_all_vectors(self) -> bool:

@@ -42,9 +42,9 @@ async def _get_record(
     with_dataset: bool = False,
     with_suggestions: bool = False,
     with_vectors: bool = False,
-    with_metadata: bool = False,
+    with_responses: bool = False,
 ) -> Record:
-    record = await datasets.get_record_by_id(db, record_id, with_dataset, with_suggestions, with_vectors, with_metadata)
+    record = await datasets.get_record_by_id(db, record_id, with_dataset, with_suggestions, with_vectors, with_responses)
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -60,7 +60,7 @@ async def get_record(
     record_id: UUID,
     current_user: User = Security(auth.get_current_user),
 ):
-    record = await _get_record(db, record_id, with_dataset=True, with_suggestions=True, with_metadata=True)
+    record = await _get_record(db, record_id, with_dataset=True, with_suggestions=True)
 
     await authorize(current_user, RecordPolicyV1.get(record))
 

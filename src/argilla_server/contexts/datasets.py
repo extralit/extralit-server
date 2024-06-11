@@ -369,7 +369,7 @@ async def get_record_by_id(
     with_dataset: bool = False,
     with_suggestions: bool = False,
     with_vectors: bool = False,
-    with_metadata: bool = False,
+    with_responses: bool = False,
 ) -> Union[Record, None]:
     query = select(Record).filter_by(id=record_id)
     if with_dataset:
@@ -380,12 +380,19 @@ async def get_record_by_id(
 
     if with_suggestions:
         query = query.options(selectinload(Record.suggestions))
+    if with_responses:
+        query = query.options(selectinload(Record.responses))
     if with_vectors:
         query = query.options(selectinload(Record.vectors))
-
     result = await db.execute(query)
 
-    return result.scalar_one_or_none()
+    record = result.scalar_one_or_none()
+
+    if record and with_responses:
+        record.responses = [response for response in record.responses \
+                            if response.status == ResponseStatus.submitted]
+
+    return record
 
 
 async def get_records_by_ids(
@@ -410,7 +417,7 @@ async def get_records_by_ids(
                 Response, and_(Response.record_id == Record.id, Response.user_id == user_id)
             ).options(contains_eager(Record.responses))
 
-    query = await _configure_query_relationships(query=query, dataset_id=dataset_id, include_params=include)
+    query = await _configure_query_relationships(query=query, dataset_id=dataset_id, include_params=include, user_id=user_id)
 
     result = await db.execute(query)
     records = result.unique().scalars().all()
@@ -423,10 +430,16 @@ async def get_records_by_ids(
 
 
 async def _configure_query_relationships(
-    query: "Select", dataset_id: UUID, include_params: Optional["RecordIncludeParam"] = None
+    query: "Select", dataset_id: UUID, include_params: Optional["RecordIncludeParam"] = None, user_id: Optional[UUID] = None
 ) -> "Select":
     if not include_params:
         return query
+    
+    if include_params.with_response_suggestions and user_id:
+        query = query.outerjoin(
+            Response, and_(Response.record_id == Record.id, Response.user_id != user_id, 
+                           Response.status in {ResponseStatus.submitted, ResponseStatus.discarded})
+        )
 
     if include_params.with_suggestions:
         query = query.options(joinedload(Record.suggestions))

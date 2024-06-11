@@ -54,6 +54,7 @@ class RecordInclude(str, Enum):
     responses = "responses"
     suggestions = "suggestions"
     vectors = "vectors"
+    response_suggestions = "response_suggestions"
 
 
 class QuestionType(str, Enum):
