@@ -11,6 +11,7 @@ from pandera.api.base.model import MetaModel
 from pandera.io import from_json, from_yaml
 from pydantic.v1 import BaseModel, Field, validator
 
+_LOGGER = logging.getLogger(__name__)
 
 class SchemaStructure(BaseModel):
     schemas: List[pa.DataFrameSchema] = Field(default_factory=list)
@@ -42,25 +43,31 @@ class SchemaStructure(BaseModel):
 
                 schemas[schema.name] = schema
             except Exception as e:
-                logging.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")
+                _LOGGER.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")
 
         return cls(schemas=list(schemas.values()))
 
     @classmethod
     def from_s3(cls, workspace: str, minio_client: Minio, prefix: str = 'schemas/',
-                exclude: List[str] = []):
+                exclude: List[str] = [], verbose: bool = True):
         schemas = {}
         objects = minio_client.list_objects(workspace, prefix=prefix, include_version=False)
 
+        # Sort the objects by file extension
+        objects = sorted(objects, key=lambda obj: (
+            os.path.splitext(obj.object_name)[1] != '', os.path.splitext(obj.object_name)[1]))
+
         for obj in objects:
             filepath = obj.object_name
+            file_extension = os.path.splitext(filepath)[1]
+
             try:
                 data = minio_client.get_object(workspace, filepath)
                 file_data = BytesIO(data.read())
 
-                if filepath.endswith('.json'):
+                if not file_extension or file_extension == '.json':
                     schema = from_json(file_data)
-                elif filepath.endswith('.yaml') or filepath.endswith('.yml'):
+                elif file_extension in ['.yaml', '.yml']:
                     schema = from_yaml(file_data)
                 else:
                     continue
@@ -68,11 +75,33 @@ class SchemaStructure(BaseModel):
                 if schema.name in schemas or schema.name in exclude:
                     continue
 
+                _LOGGER.info(f'Loaded {schema.name} from {filepath}', exc_info=1)
+                print(f'Loaded {schema.name} from `{filepath}` in `{workspace}` bucket')
                 schemas[schema.name] = schema
             except Exception as e:
-                logging.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")
+                _LOGGER.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")
 
         return cls(schemas=list(schemas.values()))
+
+    def to_s3(self, workspace: str, minio_client: Minio, prefix: str = 'schemas/'):
+        for schema in self.schemas:
+            # Serialize the schema to a JSON string
+            schema_json = schema.to_json()
+
+            # Create a BytesIO object from the JSON string
+            schema_bytes = BytesIO(schema_json.encode())
+
+            # Define the object name
+            object_name = os.path.join(prefix, schema.name)
+
+            # Upload the BytesIO object to the S3 bucket
+            minio_client.put_object(
+                bucket_name=workspace,
+                object_name=object_name,
+                data=schema_bytes,
+                length=schema_bytes.getbuffer().nbytes,
+                content_type='application/json'
+            )
 
     @property
     def downstream_dependencies(self) -> Dict[str, List[str]]:
