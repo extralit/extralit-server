@@ -412,7 +412,11 @@ async def list_current_user_dataset_records(
     current_user: User = Security(auth.get_current_user),
 ):
     dataset = await _get_dataset_or_raise(db, dataset_id, with_questions=True)
-    workspace_users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
+    if include and include.with_response_suggestions:
+        workspace_users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
+        workspace_user_ids = [user.id for user in workspace_users.items]
+    else:
+        workspace_user_ids = None
 
     await authorize(current_user, DatasetPolicyV1.get(dataset))
 
@@ -427,7 +431,7 @@ async def list_current_user_dataset_records(
         response_statuses=response_statuses,
         include=include,
         sort_by_query_param=sort_by_query_param or LIST_DATASET_RECORDS_DEFAULT_SORT_BY,
-        workspace_user_ids=[user.id for user in workspace_users.items],
+        workspace_user_ids=workspace_user_ids,
     )
 
     if include and include.with_response_suggestions:

@@ -25,7 +25,7 @@ class PaperExtraction(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def get_joined_data(self, schema_name: str, drop_joined_index=False) -> pd.DataFrame:
+    def get_joined_data(self, schema_name: str, drop_joined_index=True) -> pd.DataFrame:
         schema = self.schemas[schema_name]
 
         df = self[schema_name]
