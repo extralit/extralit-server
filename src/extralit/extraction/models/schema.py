@@ -103,6 +103,25 @@ class SchemaStructure(BaseModel):
                 content_type='application/json'
             )
 
+    def get_joined_schema(self, schema_name: str):
+        combined_columns = {}
+        combined_checks = []
+
+        # Iterate over the provided schema and its dependent schemas
+        dependent_schemas: List[pa.DataFrameSchema] = [
+            self.__getitem__(sn) for sn in self.upstream_dependencies.get(schema_name)
+        ]
+
+        for schema in [self.__getitem__(schema_name)] + dependent_schemas:
+            for column_name, column_schema in schema.columns.items():
+                if column_name not in combined_columns:
+                    combined_columns[column_name] = column_schema
+
+            combined_checks.extend(schema.checks)
+
+        joined_schema = pa.DataFrameSchema(columns=combined_columns, checks=combined_checks, name=schema_name)
+        return joined_schema
+
     @property
     def downstream_dependencies(self) -> Dict[str, List[str]]:
         dependencies = {}

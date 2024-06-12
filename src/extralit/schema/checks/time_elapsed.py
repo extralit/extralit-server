@@ -13,9 +13,11 @@ def check_time_difference(
     between start_year (and start_month) and end_year (and end_month) in months.
     """
     start_dates = pd.to_datetime(df[start_year].astype(str) + '-' + df[start_month].astype(str),
+                                 format='%Y-%m',
                                  yearfirst=True,
                                  errors='coerce')
     end_dates = pd.to_datetime(df[end_year].astype(str) + '-' + df[end_month].astype(str),
+                               format='%Y-%m',
                                yearfirst=True,
                                errors='coerce')
     calculated_time_elapsed = (end_dates - start_dates).dt.days

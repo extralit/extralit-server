@@ -5,11 +5,12 @@ from typing import Dict, Iterator, Tuple, Optional, Union
 
 import pandas as pd
 import pandera as pa
-from extralit.extraction.models.schema import SchemaStructure
 from pandera.api.base.model import MetaModel
 from pydantic.v1 import BaseModel, Field
 
+from extralit.extraction.models.schema import SchemaStructure
 from extralit.schema.checks import register_check_methods
+
 _LOGGER = logging.getLogger(__name__)
 register_check_methods()
 
@@ -27,36 +28,41 @@ class PaperExtraction(BaseModel):
 
     def get_joined_data(self, schema_name: str, drop_joined_index=True) -> pd.DataFrame:
         schema = self.schemas[schema_name]
-
-        df = self[schema_name]
-        if not isinstance(schema, pa.DataFrameSchema) and hasattr(schema, 'to_schema'):
-            schema = schema.to_schema()
-        else:
-            assert isinstance(schema,
-                              pa.DataFrameSchema), f"Expected DataFrameModel or DataFrameSchema, got {type(schema)}"
+        df = self[schema_name].copy()
 
         # For each '_ref' key, find the matching DataFrame with the same DataFrameModel prefix
-        for ref_index_name in schema.index.names:
-            ref_schema = ref_index_name.rsplit('_ref', 1)[0].lower()
+        for ref_column in schema.index.names[::-1]:
+            dep_schema_name = ref_column.rsplit('_ref', 1)[0].lower()
+            if ref_column not in df.index.names and ref_column not in df.columns:
+                # Skip if the DataFrame is already joined
+                _LOGGER.info(f"Skipping join on {ref_column} as it is already joined. \n{df.index.names}\n{df.columns}")
+                continue
 
-            matching_df = next((value for key, value in self.extractions.items() if str(key).lower() == ref_schema),
-                               None)
-            if matching_df is not None:
-                try:
-                    df = df.join(matching_df.rename_axis(index={'reference': ref_index_name}), how='left',
-                                 rsuffix='_joined')
-                    df = overwrite_joined_columns(df, rsuffix='_joined')
-                    if drop_joined_index and ref_index_name in df.index.names:
-                        df = df.reset_index(level=ref_index_name, drop=True)
-                except NotImplementedError as e:
-                    _LOGGER.info(f'{ref_schema}-{schema.name} extraction table is already joined.')
-                except Exception as e:
-                    print(f"Failed to join `{ref_schema}` to {schema.name}: {e}",
-                          # df.shape, matching_df.shape, df.index.names, matching_df.index.names, df.columns, matching_df.columns
-                          )
-                    raise e
+            dependent_df = next(
+                (value.copy() for key, value in self.extractions.items() \
+                 if str(key).lower() == dep_schema_name and value.size > 0),
+                None)
+
+            if dependent_df is None:
+                continue
+
+            try:
+                dependent_df = dependent_df.rename_axis(index={'reference': ref_column})
+                df = df.join(dependent_df, how='left', rsuffix='_joined')
+                df = overwrite_joined_columns(df, rsuffix='_joined', prepend=True)
+                if drop_joined_index and ref_column in df.index.names:
+                    df = df.reset_index(level=ref_column, drop=True)
+            except NotImplementedError as e:
+                _LOGGER.info(f'{dep_schema_name}-{schema.name} extraction table is already joined.')
+            except Exception as e:
+                _LOGGER.error(f"Failed to join `{dep_schema_name}` to {schema.name}: {e}")
+                raise e
 
         return df
+
+    @property
+    def size(self):
+        return sum(df.size for schema_name, df in self.extractions.items())
 
     def __getitem__(self, item: str) -> pd.DataFrame:
         if isinstance(item, pa.DataFrameSchema):
@@ -94,18 +100,18 @@ class PaperExtraction(BaseModel):
         return args
 
 
-def overwrite_joined_columns(df: pd.DataFrame, rsuffix='_joined') -> pd.DataFrame:
-    # Find all columns with the '_joined' suffix
-    joined_columns = [col for col in df.columns if col.endswith(rsuffix)]
+def overwrite_joined_columns(df: pd.DataFrame, rsuffix='_joined', prepend=True) -> pd.DataFrame:
+    # Overwrite the original column with the '_joined' column
+    suffix_columns = [col for col in df.columns if col.endswith(rsuffix)]
+    joined_columns = [col.rsplit(rsuffix, 1)[0] for col in suffix_columns]
 
-    for joined_col in joined_columns:
-        # Get the original column name by removing the '_joined' suffix
+    for joined_col in suffix_columns:
         original_col = joined_col.rsplit(rsuffix, 1)[0]
-
-        # Overwrite the original column with the '_joined' column
         df[original_col] = df[joined_col]
-
-        # Drop the '_joined' column
         df = df.drop(columns=joined_col)
+
+    if prepend:
+        column_reorder = [*joined_columns, *df.columns.difference(joined_columns)]
+        df = df.reindex(columns=column_reorder)
 
     return df
