@@ -112,7 +112,7 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset, schemas
     updated_at = {}
     inserted_at = {}
     user_id = {}
-    consensus = {}
+
     for record in records:
         if record.metadata['reference'] != reference:
             continue
