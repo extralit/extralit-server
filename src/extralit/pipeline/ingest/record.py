@@ -15,8 +15,28 @@ def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
                     suggestions: Optional[Union[List[str], str]] = None,
                     metadatas: Optional[Union[List[str], str]] = None,
                     users: Optional[Union[List[rg.User], rg.User]] = None,
-                    skip_status: Optional[List[str]] = ["discarded"]) \
+                    include_user_id=False,
+                    skip_status: Optional[List[str]] = ["discarded"],
+                    ) \
         -> Dict[str, Any]:
+    """
+    Extracts data from a feedback record based on the specified parameters.
+
+    Args:
+        record (Union[RemoteFeedbackRecord, rg.FeedbackRecord]): The feedback record to extract data from.
+        fields (Union[List[str], str]): The fields to extract from the record.
+        answers (Optional[Union[List[str], str]]): The answers to extract from the record's responses.
+        suggestions (Optional[Union[List[str], str]]): The suggestions to extract from the record's responses.
+        metadatas (Optional[Union[List[str], str]]): The metadata keys to extract from the record.
+        users (Optional[Union[List[rg.User], rg.User]]): The users whose responses should be considered.
+        include_user_id (bool, optional): Whether to include the user ID in the output. Defaults to False.
+        include_consensus (Optional[str], optional): If not None, then include the concensus status with the provided key as the argument. Defaults to None.
+        skip_status (Optional[List[str]], optional): The statuses to skip. Defaults to ["discarded"].
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the extracted data.
+
+    """
     fields = [fields] if isinstance(fields, str) else set(fields) if fields else []
     answers = [answers] if isinstance(answers, str) else set(answers) if answers else []
     suggestions = [suggestions] if isinstance(suggestions, str) else set(suggestions) if suggestions else []
@@ -42,6 +62,9 @@ def get_record_data(record: Union[RemoteFeedbackRecord, rg.FeedbackRecord],
     for answer in answers:
         if selected_response and answer in selected_response.values:
             data[answer] = selected_response.values[answer].value
+
+            if include_user_id:
+                data['user_id'] = selected_response.user_id
 
     for suggestion in suggestions:
         data[suggestion] = get_record_suggestion_value(record, question_name=suggestion, users=users)

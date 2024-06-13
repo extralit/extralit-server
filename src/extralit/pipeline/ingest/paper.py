@@ -1,4 +1,4 @@
-from typing import Dict, Type, List, Literal, Optional
+from typing import List, Literal, Optional
 
 import argilla as rg
 import pandas as pd
@@ -96,12 +96,10 @@ def get_paper_tables(paper: pd.Series,
     return segments
 
 
-def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
-                          schemas: SchemaStructure,
-                          field: str,
-                          answer: str,
-                          suggestion: Optional[str]=None,
-                          user: Optional[rg.User] = None, ) -> PaperExtraction:
+def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset, schemas: SchemaStructure, answer: str,
+                          field: Optional[str] = None,
+                          suggestion: Optional[str] = None,
+                          users: Optional[List[rg.User]] = None) -> PaperExtraction:
 
     reference = paper.name
     records: List[RemoteFeedbackRecord] = dataset.filter_by(
@@ -113,15 +111,18 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
     durations = {}
     updated_at = {}
     inserted_at = {}
+    user_id = {}
+    consensus = {}
     for record in records:
         if record.metadata['reference'] != reference:
             continue
 
-        outputs = get_record_data(record,
-                                  fields=field,
-                                  answers=[answer, 'duration'] if answer else ['duration'],
-                                  suggestions=[suggestion] if suggestion else [],
-                                  users=user)
+        outputs = get_record_data(
+            record, fields=field, answers=[answer, 'duration'] if answer else ['duration'],
+            suggestions=[suggestion] if suggestion else [],
+            users=users,
+            include_user_id=True,
+        )
 
         if suggestion in outputs:
             table_json = outputs[suggestion]
@@ -138,7 +139,9 @@ def get_paper_extractions(paper: pd.Series, dataset: rg.FeedbackDataset,
                 durations[schema.name] = outputs.get('duration', None)
                 updated_at[schema.name] = max([res.updated_at for res in record.responses], default=record.updated_at)
                 inserted_at[schema.name] = record.inserted_at
+                user_id[schema.name] = outputs.get('user_id', None)
 
-    return PaperExtraction(reference=reference, extractions=extractions, schemas=schemas,
-                           durations=durations, updated_at=updated_at, inserted_at=inserted_at)
-
+    return PaperExtraction(
+        reference=reference, extractions=extractions, schemas=schemas,
+        durations=durations, updated_at=updated_at, inserted_at=inserted_at,
+        user_id=user_id)

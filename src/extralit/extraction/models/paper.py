@@ -2,6 +2,7 @@ import itertools
 import logging
 from datetime import datetime
 from typing import Dict, Iterator, Tuple, Optional, Union
+from uuid import UUID
 
 import pandas as pd
 import pandera as pa
@@ -22,6 +23,7 @@ class PaperExtraction(BaseModel):
     durations: Dict[str, Optional[float]] = Field(default_factory=dict)
     updated_at: Dict[str, Optional[datetime]] = Field(default_factory=dict)
     inserted_at: Dict[str, Optional[datetime]] = Field(default_factory=dict)
+    user_id: Dict[str, Optional[UUID]] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True
