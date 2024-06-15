@@ -397,7 +397,7 @@ async def _get_vector_settings_by_name_or_raise(
     return vector_settings
 
 
-def convert_users_response_suggestions(
+def convert_workspace_users_response_suggestions(
         records: Records,
         current_user: User, 
         workspace_users: List[User], 
@@ -417,7 +417,6 @@ def convert_users_response_suggestions(
                 if question_name not in question_name2id or \
                     not suggestion_value or not suggestion_value.get("value"): continue
                 question = question_name2id.get(question_name)
-                # print(question.id, question.type, suggestion_value)
 
                 suggestion = Suggestion(
                     id=response.id,
@@ -431,8 +430,10 @@ def convert_users_response_suggestions(
                 )
                 record.suggestions.append(suggestion)
 
-        record.responses = [response for response in record.responses \
-                            if response.user_id == current_user.id]
+        if record.responses and record.responses[0].user_id == current_user.id:
+            record.responses = [record.responses[0]]
+        else:
+            record.responses = []
 
 
 @router.get("/me/datasets/{dataset_id}/records", response_model=Records, response_model_exclude_unset=True)
@@ -473,7 +474,7 @@ async def list_current_user_dataset_records(
     )
 
     if include and include.with_response_suggestions:
-        convert_users_response_suggestions(records, current_user, workspace_users, dataset)
+        convert_workspace_users_response_suggestions(records, current_user, workspace_users, dataset)
 
     return Records(items=records, total=total)
 
@@ -658,7 +659,7 @@ async def search_current_user_dataset_records(
     )
 
     if include and include.with_response_suggestions:
-        convert_users_response_suggestions(records, current_user, workspace_users, dataset)
+        convert_workspace_users_response_suggestions(records, current_user, workspace_users, dataset)
 
     for record in records:
         record_id_score_map[record.id]["search_record"] = SearchRecord(
