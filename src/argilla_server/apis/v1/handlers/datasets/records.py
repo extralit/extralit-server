@@ -397,6 +397,44 @@ async def _get_vector_settings_by_name_or_raise(
     return vector_settings
 
 
+def convert_users_response_suggestions(
+        records: Records,
+        current_user: User, 
+        workspace_users: List[User], 
+        dataset: Dataset, 
+        ):
+    user_id2name = {user.id: user.username for user in workspace_users.items}
+    question_name2id = {question.name: question for question in dataset.questions}
+    
+    for record in records:
+        suggestion_responses = [response for response in record.responses \
+                                if response.user_id != current_user.id]
+
+        for response in suggestion_responses:
+            if response.status == ResponseStatus.discarded: continue
+
+            for question_name, suggestion_value in response.values.items():
+                if question_name not in question_name2id or \
+                    not suggestion_value or not suggestion_value.get("value"): continue
+                question = question_name2id.get(question_name)
+                # print(question.id, question.type, suggestion_value)
+
+                suggestion = Suggestion(
+                    id=response.id,
+                    question_id=question.id,
+                    type="human",
+                    value=suggestion_value.get("value"),
+                    agent=user_id2name.get(response.user_id),
+                    score=None,
+                    inserted_at=response.inserted_at,
+                    updated_at=response.updated_at
+                )
+                record.suggestions.append(suggestion)
+
+        record.responses = [response for response in record.responses \
+                            if response.user_id == current_user.id]
+
+
 @router.get("/me/datasets/{dataset_id}/records", response_model=Records, response_model_exclude_unset=True)
 async def list_current_user_dataset_records(
     *,
@@ -438,43 +476,6 @@ async def list_current_user_dataset_records(
         convert_users_response_suggestions(records, current_user, workspace_users, dataset)
 
     return Records(items=records, total=total)
-
-def convert_users_response_suggestions(
-        records: Records,
-        current_user: User, 
-        workspace_users: List[User], 
-        dataset: Dataset, 
-        ):
-    user_id2name = {user.id: user.username for user in workspace_users.items}
-    question_name2id = {question.name: question for question in dataset.questions}
-    
-    for record in records:
-        suggestion_responses = [response for response in record.responses \
-                                if response.user_id != current_user.id]
-
-        for response in suggestion_responses:
-            if response.status == ResponseStatus.discarded: continue
-
-            for question_name, suggestion_value in response.values.items():
-                if question_name not in question_name2id or \
-                    not suggestion_value or not suggestion_value.get("value"): continue
-                question = question_name2id.get(question_name)
-                # print(question.id, question.type, suggestion_value)
-
-                suggestion = Suggestion(
-                    id=response.id,
-                    question_id=question.id,
-                    type="human",
-                    value=suggestion_value.get("value"),
-                    agent=user_id2name.get(response.user_id),
-                    score=None,
-                    inserted_at=response.inserted_at,
-                    updated_at=response.updated_at
-                )
-                record.suggestions.append(suggestion)
-
-        record.responses = [response for response in record.responses \
-                            if response.user_id == current_user.id]
 
 
 @router.get("/datasets/{dataset_id}/records", response_model=Records, response_model_exclude_unset=True)
