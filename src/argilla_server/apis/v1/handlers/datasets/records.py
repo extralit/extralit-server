@@ -435,35 +435,46 @@ async def list_current_user_dataset_records(
     )
 
     if include and include.with_response_suggestions:
-        user_id2name = {user.id: user.username for user in workspace_users.items}
-        question_name2id = {question.name: question.id for question in dataset.questions}
-        
-        for record in records:
-            suggestion_responses = [response for response in record.responses \
-                                    if response.user_id != current_user.id]
-
-            for response in suggestion_responses:
-                if response.status == ResponseStatus.discarded: continue
-
-                for question_name, value in response.values.items():
-                    if question_name not in question_name2id or not value: continue
-
-                    suggestion = Suggestion(
-                        id=response.id,
-                        question_id=question_name2id.get(question_name),
-                        type="human",
-                        value=value,
-                        agent=user_id2name.get(response.user_id),
-                        score=None,
-                        inserted_at=response.inserted_at,
-                        updated_at=response.updated_at
-                    )
-                    record.suggestions.append(suggestion)
-
-            record.responses = [response for response in record.responses \
-                                if response.user_id == current_user.id]
+        convert_users_response_suggestions(records, current_user, workspace_users, dataset)
 
     return Records(items=records, total=total)
+
+def convert_users_response_suggestions(
+        records: Records,
+        current_user: User, 
+        workspace_users: List[User], 
+        dataset: Dataset, 
+        ):
+    user_id2name = {user.id: user.username for user in workspace_users.items}
+    question_name2id = {question.name: question for question in dataset.questions}
+    
+    for record in records:
+        suggestion_responses = [response for response in record.responses \
+                                if response.user_id != current_user.id]
+
+        for response in suggestion_responses:
+            if response.status == ResponseStatus.discarded: continue
+
+            for question_name, suggestion_value in response.values.items():
+                if question_name not in question_name2id or \
+                    not suggestion_value or not suggestion_value.get("value"): continue
+                question = question_name2id.get(question_name)
+                # print(question.id, question.type, suggestion_value)
+
+                suggestion = Suggestion(
+                    id=response.id,
+                    question_id=question.id,
+                    type="human",
+                    value=suggestion_value.get("value"),
+                    agent=user_id2name.get(response.user_id),
+                    score=None,
+                    inserted_at=response.inserted_at,
+                    updated_at=response.updated_at
+                )
+                record.suggestions.append(suggestion)
+
+        record.responses = [response for response in record.responses \
+                            if response.user_id == current_user.id]
 
 
 @router.get("/datasets/{dataset_id}/records", response_model=Records, response_model_exclude_unset=True)
@@ -606,7 +617,13 @@ async def search_current_user_dataset_records(
     limit: int = Query(default=LIST_DATASET_RECORDS_LIMIT_DEFAULT, ge=1, le=LIST_DATASET_RECORDS_LIMIT_LE),
     current_user: User = Security(auth.get_current_user),
 ):
-    dataset = await _get_dataset_or_raise(db, dataset_id, with_fields=True)
+    dataset = await _get_dataset_or_raise(db, dataset_id, with_fields=True, with_questions=True)
+    if include and include.with_response_suggestions:
+        workspace_users = await list_workspace_users(db=db, workspace_id=dataset.workspace_id, current_user=current_user)
+        workspace_user_ids = [user.id for user in workspace_users.items]
+    else:
+        workspace_user_ids = None
+
 
     await authorize(current_user, DatasetPolicyV1.search_records(dataset))
 
@@ -636,7 +653,11 @@ async def search_current_user_dataset_records(
         records_ids=list(record_id_score_map.keys()),
         include=include,
         user_id=current_user.id,
+        workspace_user_ids=workspace_user_ids,
     )
+
+    if include and include.with_response_suggestions:
+        convert_users_response_suggestions(records, current_user, workspace_users, dataset)
 
     for record in records:
         record_id_score_map[record.id]["search_record"] = SearchRecord(

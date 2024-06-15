@@ -7,7 +7,7 @@ import pandas as pd
 from llama_index.core.schema import Document
 
 from extralit.convert.html_table import html_to_df
-from extralit.pipeline.ingest.paper import get_paper_tables
+from extralit.pipeline.ingest.segment import get_paper_tables
 from extralit.preprocessing.document import create_or_load_nougat_segments
 from extralit.preprocessing.segment import Segments
 

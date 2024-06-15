@@ -120,7 +120,7 @@ def create_publication_records(
             assert isinstance(dataset, RemoteFeedbackDataset)
             if isinstance(paper.file_path, str):
                 doc = dataset.add_document(
-                    rg.Document.from_file(paper.file_path, reference=ref, pmid=paper.pmid, doi=paper.doi,
+                    rg.Document.from_file(paper.file_path, reference=paper.name, pmid=paper.pmid, doi=paper.doi,
                                           id=paper.id if hasattr(paper, 'id') else None))
             else:
                 raise Exception(f'Unable to load document for {paper.name}')
@@ -133,15 +133,19 @@ def create_publication_records(
             **({"doc_id": str(doc.id)} if doc.id is not None else {}),
         }
 
-        publication_metadata = pd.Series({
+        publication_metadata = {
             'title': paper.title,
             'authors': ', '.join([f"{author.get('first_name')} {author.get('last_name')}".strip() \
                                   for author in paper.authors]),
-            'journal': paper.source, 'year': paper.year,
-            'doi': paper.doi, 'pmid': paper.pmid,
+            'journal': paper.source,
+            'year': paper.year,
+            'doi': paper.doi,
+            'pmid': paper.pmid,
             'keywords': paper.keywords,
             'collections': paper.collections,
-        }, name=paper.name)
+        }
+        metadata.update(publication_metadata)
+        publication_metadata = pd.Series(publication_metadata, name=paper.name)
 
         fields = {
             'metadata': publication_metadata.to_frame().to_html(index=True),
@@ -161,7 +165,7 @@ def create_publication_records(
             agent = None
         suggestions = []
         for field in schema.columns:
-            if field.lower() in question_names and field in paper and paper[field] is not None:
+            if field in question_names and field in paper and paper[field] is not None:
                 suggestions.append({
                     "question_name": field.lower(),
                     "value": str(paper[field]),
@@ -171,7 +175,7 @@ def create_publication_records(
 
         record = rg.FeedbackRecord(
             fields=fields,
-            metadata=metadata,
+            metadata={k: v for k, v in metadata.items() if not pd.isna(v)},
             suggestions=suggestions,
             vectors=vectors,
         )

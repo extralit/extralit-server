@@ -21,6 +21,12 @@ class SchemaStructure(BaseModel):
     def parse_schema(cls, v: Union[pa.DataFrameModel, pa.DataFrameSchema]):
         return v.to_schema() if hasattr(v, 'to_schema') else v
 
+    @validator('document_schema', pre=True)
+    def parse_document_schema(cls, v: Union[pa.DataFrameModel, pa.DataFrameSchema]):
+        schema: pa.DataFrameSchema = v.to_schema() if hasattr(v, 'to_schema') else v
+        assert all(key.islower() for key in schema.columns.keys()), f"All keys in {schema.name} schema must be lowercased"
+        return schema
+
     @classmethod
     def from_dir(cls, dir_path: str, exclude: List[str]=[]):
         schemas = {}
