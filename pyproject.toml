@@ -92,7 +92,8 @@ extraction = [
     "rapidfuzz ~= 3.8.1",
     "dill ~= 0.3.8",
     "json-repair ~= 0.19.2",
-    "fastparquet"
+    "fastparquet",
+    "tiktoken"
 ]
 nlp = [
     "textdescriptives",
@@ -100,7 +101,7 @@ nlp = [
 ]
 ocr = [
     "nougat-ocr[api]",
-    "timm == 0.5.4",
+    "transformers ~= 4.25.1"
 ]
 pdf = [
     "unstructured[pdf] ~= 0.12.3",
@@ -109,6 +110,7 @@ pdf = [
     "python-doctr ~= 0.8.1",
     "pypdf",
     "pypdfium2",
+    "pymupdf",
     "pdf2image ~= 1.16.0",
 ]
 llm = [

@@ -17,7 +17,7 @@ try:
     from nougat.utils.device import default_batch_size, move_to_device
     from torch.utils.data import ConcatDataset
 except ImportError:
-    print("It seems like you're missing some dependencies. Please run `pip install extralit['pdf']` to install them.")
+    raise ImportError("It seems like you're missing some dependencies. Please run `pip install extralit['ocr']` to install them.")
 
 
 class NougatOCR:
