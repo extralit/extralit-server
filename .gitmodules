@@ -1,4 +1,4 @@
 [submodule "argilla"]
 	path = argilla
-	url = https://github.com/JonnyTran/extralit-frontend
+	url = https://github.com/JonnyTran/extralit
 	branch = develop

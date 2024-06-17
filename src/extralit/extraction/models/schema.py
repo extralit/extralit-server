@@ -82,7 +82,6 @@ class SchemaStructure(BaseModel):
                     continue
 
                 _LOGGER.info(f'Loaded {schema.name} from {filepath}', exc_info=1)
-                print(f'Loaded {schema.name} from `{filepath}` in `{workspace}` bucket')
                 schemas[schema.name] = schema
             except Exception as e:
                 _LOGGER.warning(f"Ignoring failed schema loading from '{filepath}': \n{e}")

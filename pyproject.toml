@@ -76,7 +76,6 @@ postgresql = [
 ]
 extraction = [
     "minio",
-    "argilla",
     "hypothesis",
     "html5lib",
     "fastapi < 1.0.0",
