@@ -138,8 +138,8 @@ class WeaviateVectorStore(WeaviateVectorStoreV0_10_0):
             raise ValueError("Either node_ids or filters must be provided")
 
         results = collection.data.delete_many(where=filters, verbose=True)
-        print(f"Deleted nodes", results.objects)
-        _LOGGER.debug(f"Deleted {len(results.objects)} nodes")
+        if results.objects:
+            _LOGGER.debug(f"Deleted {len(results.objects)} nodes")
 
     def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """Query index for top k most similar nodes."""

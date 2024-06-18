@@ -79,7 +79,7 @@ async def chat(
     index = load_index(paper=pd.Series(name=reference), llm_model=llm_model, embed_model='text-embedding-3-small',
                        weaviate_client=weaviate_client, index_name="LlamaIndexDocumentSections")
 
-    if not vectordb_contains_any(reference, weaviate_client, index_name="LlamaIndexDocumentSections"):
+    if not vectordb_contains_any(reference, weaviate_client=weaviate_client, index_name="LlamaIndexDocumentSections"):
         raise HTTPException(status_code=404, detail=f"No context found for reference: {reference}")
 
     try:

@@ -36,7 +36,7 @@ DEFAULT_EXTRACTION_PROMPT_TMPL = DATA_EXTRACTION_SYSTEM_PROMPT_TMPL
 def create_extraction_prompt(
         schema: pa.DataFrameSchema, extractions: PaperExtraction, filter_unique_cols=False) -> str:
     prompt = (
-        f"Your task is to extract data from a malaria research paper.\n"
+        f"Your task is to extract data from a research paper.\n"
         f"The `{schema.name}` details can be split across the provided context. Respond with details by looking at the whole context always.\n"
         f"If you don't find the information in the given context or you are not sure, "
         f"omit the key-value in your JSON response. ")

@@ -108,7 +108,11 @@ def create_table_nodes(table_segments, extra_metadata: Optional[Dict[str, Any]],
         if not segment.html:
             continue
 
-        df = html_to_df(segment.html, convert_spanning_rows=True)
+        try:
+            df = html_to_df(segment.html, convert_spanning_rows=True)
+        except Exception as e:
+            print(f"Failed to convert HTML to DataFrame: {e}")
+            continue
 
         assert df.columns.nlevels == 1, f"MultiIndex columns are not supported, given {df.columns}"
         metadata = segment.dict(include=INCLUDE_METADATA_KEYS)

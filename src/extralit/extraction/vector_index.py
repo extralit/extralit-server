@@ -2,7 +2,7 @@ import logging
 import os.path
 from collections import Counter
 from os.path import join
-from typing import Optional
+from typing import Optional, Literal
 
 import argilla as rg
 import pandas as pd
@@ -35,12 +35,12 @@ def create_local_index(paper: pd.Series,
                        chunk_overlap=200,
                        verbose=True, ) \
         -> VectorStoreIndex:
-    text_documents, table_documents = create_nodes(
+    text_nodes, table_nodes = create_nodes(
         paper, preprocessing_path=preprocessing_path,
         preprocessing_dataset=preprocessing_dataset)
 
     _LOGGER.info(
-        f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments, `persist_dir={persist_dir}`")
+        f"Creating index with {len(text_nodes)} text and {len(table_nodes)} table segments, `persist_dir={persist_dir}`")
 
     storage_context = get_storage_context(persist_dir=persist_dir)
     embedding_model = OpenAIEmbedding(
@@ -57,10 +57,10 @@ def create_local_index(paper: pd.Series,
         node_parser=SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap),
     )
     index = VectorStoreIndex.from_documents(
-        text_documents, storage_context=storage_context, service_context=embed_model_context)
+        text_nodes, storage_context=storage_context, service_context=embed_model_context)
 
     index.insert_nodes(
-        table_documents, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
+        table_nodes, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
 
     if persist_dir and not storage_context.vector_store:
         assert os.path.exists(persist_dir)
@@ -82,12 +82,37 @@ def create_vector_index(paper: pd.Series,
                         embed_model='text-embedding-3-small',
                         dimensions=1536,
                         retrieval_mode=DEFAULT_RETRIEVAL_MODE,
-                        overwrite=True,
+                        overwrite: Literal[True, 'text', 'table', 'figure']='table',
                         chunk_size=4096,
                         chunk_overlap=200,
                         verbose=True, ) \
         -> VectorStoreIndex:
-    text_documents, table_documents = create_nodes(
+    """
+    Creates a VectorStoreIndex for a given paper and uploading .
+
+    Args:
+        paper (pd.Series): The paper to be indexed.
+        weaviate_client (WeaviateClient): The Weaviate client to use.
+        preprocessing_dataset (Optional[rg.FeedbackDataset]):
+            The preprocessing dataset to use. Defaults to None.
+            If given, the TableSegments will be loaded from the Argilla dataset with users' annotations. If None,
+            the TableSegments will be loaded from the preprocessed table extractions locally from `preprocessing_path`.
+        preprocessing_path (str): The path to the preprocessing data. Defaults to 'data/preprocessing/nougat/'.
+        index_name (Optional[str]): The name of the index. Defaults to "LlamaIndexDocumentSections".
+        embed_model (str): The model to use for embedding documents. Defaults to 'text-embedding-3-small'.
+        dimensions (int): The dimensions of the embedding model. Defaults to 1536.
+        retrieval_mode (str): The retrieval mode of the embedding model. Defaults to DEFAULT_RETRIEVAL_MODE.
+        overwrite (Literal[True, 'text', 'table', 'figure']): The type of nodes to overwrite. Defaults to True,
+            which overwrites all nodes for the reference.
+        chunk_size (int): The size of the chunks to split the text into. Defaults to 4096.
+        chunk_overlap (int): The size of the overlap between chunks. Defaults to 200.
+        verbose (bool): Whether to print verbose output. Defaults to True.
+
+    Returns:
+        VectorStoreIndex: The loaded VectorStoreIndex.
+    """
+
+    text_nodes, table_nodes = create_nodes(
         paper, preprocessing_path=preprocessing_path,
         preprocessing_dataset=preprocessing_dataset)
 
@@ -96,14 +121,13 @@ def create_vector_index(paper: pd.Series,
             name=f"embed-{paper.name}", tags=[paper.name]
         )
 
-    print(
-        f"Creating index {paper.name} with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
     vector_store = WeaviateVectorStore(weaviate_client=weaviate_client, index_name=index_name)
-    if vectordb_contains_any(paper.name, weaviate_client=weaviate_client, index_name=index_name) and overwrite:
-        filters = MetadataFilters(
-            filters=[MetadataFilter(key="reference", value=paper.name, operator=FilterOperator.EQ)],
-        )
-        vector_store.delete_nodes(filters=filters)
+    has_existing_node = vectordb_contains_any(paper.name, weaviate_client=weaviate_client, index_name=index_name)
+    if has_existing_node and overwrite:
+        delete_filters = [MetadataFilter(key="reference", value=paper.name, operator=FilterOperator.EQ)]
+        if isinstance(overwrite, str):
+            delete_filters.append(MetadataFilter(key="type", value=overwrite, operator=FilterOperator.EQ))
+        vector_store.delete_nodes(filters=MetadataFilters(filters=delete_filters,))
 
     embedding_model = OpenAIEmbedding(mode=retrieval_mode, model=embed_model, dimensions=dimensions)
     embed_model_context = ServiceContext.from_defaults(
@@ -111,11 +135,24 @@ def create_vector_index(paper: pd.Series,
         node_parser=SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap),
     )
 
+    if has_existing_node and not overwrite:
+        _LOGGER.info(f"Skipping existing index for {paper.name}")
+        return VectorStoreIndex.from_vector_store(vector_store, service_context=embed_model_context)
+
+
     loaded_index = VectorStoreIndex.from_vector_store(vector_store, service_context=embed_model_context)
-    for document in text_documents:
-        loaded_index.insert(document)
-    for document in table_documents:
-        loaded_index.insert(document, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
+    for node in text_nodes:
+        if has_existing_node and overwrite != 'text':
+            continue
+        print(
+            f"{paper.name}: Adding {len(text_nodes)} text segments at Weaviate index_name: {index_name}")
+        loaded_index.insert(node)
+    for node in table_nodes:
+        if has_existing_node and overwrite != 'table':
+            continue
+        print(
+            f"{paper.name}: Adding {len(table_nodes)} table segments at Weaviate index_name: {index_name}")
+        loaded_index.insert(node, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
 
     if verbose:
         nodes_counts = Counter([doc.metadata['header'] for doc in loaded_index.docstore.docs.values()])

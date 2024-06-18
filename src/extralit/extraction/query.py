@@ -45,16 +45,16 @@ def get_nodes_metadata(weaviate_client: WeaviateClient,
     return entries
 
 
-def vectordb_contains_any(reference: str, weaviate_client: WeaviateClient,
-                          index_name: str = 'LlamaIndexDocumentSections') -> bool:
+def vectordb_contains_any(reference: str, *, filters: Optional[Dict[str, str]] = None,
+                          weaviate_client: WeaviateClient = None, index_name: str = 'LlamaIndexDocumentSections') -> bool:
     if weaviate_client is None:
         return False
 
-    has_document_in_vecstore = get_nodes_metadata(
+    nodes = get_nodes_metadata(
         weaviate_client, index_name=index_name,
-        filters={'reference': reference},
-        properties=['doc_id', 'reference'],
+        filters={'reference': reference, **(filters or {})},
+        properties=['doc_id', 'reference', 'type'],
         limit=1)
 
-    return len(has_document_in_vecstore) > 0
+    return len(nodes) > 0
 

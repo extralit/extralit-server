@@ -1,11 +1,11 @@
-from typing import Dict, List
+from typing import Dict, List, Optional, Literal, Union, Any
 
 import argilla as rg
 import pandas as pd
 import pandera as pa
 
 
-def pandera_schema_to_argilla_dataset(
+def create_papers_dataset(
         schema: pa.DataFrameSchema,
         papers: pd.DataFrame,
         fields: List[rg.TextField] = None,
@@ -62,3 +62,65 @@ def pandera_schema_to_argilla_dataset(
         vectors_settings=vectors_settings,
         **kwargs
     )
+
+
+def create_extraction_dataset(
+        fields: Optional[List[rg.TextField]]=None,
+        questions: Optional[List[rg.TextQuestion]]=None,
+        metadata_properties: Optional[List[rg.TermsMetadataProperty]] = None,
+        vectors_settings: Optional[List[rg.VectorSettings]]=None) -> rg.FeedbackDataset:
+    extraction_dataset = rg.FeedbackDataset(
+        guidelines="Manually validate every data entries in the data extraction sheet to build a "
+                   "gold-standard validation dataset.",
+        fields=[
+            rg.TextField(name="metadata", title="Reference:", required=True, use_markdown=True),
+            rg.TextField(name="extraction", title="Extracted data:", required=True, use_table=True),
+            rg.TextField(name="context", title="Top relevant segments:", required=False, use_markdown=True),
+            *(fields or [])
+        ],
+        questions=[
+            rg.MultiLabelQuestion(
+                name="context-relevant",
+                title="Select the segment ID(s) attributed this extraction:",
+                description="Note that the table number isn't the same as the segment ID. Please refer to Top relevant segments on the left hand-side.",
+                labels=list(range(50)),
+                visible_labels=3,
+                required=True,
+            ),
+
+            rg.MultiLabelQuestion(
+                name="extraction-source",
+                title="Which source data type(s) did the extracted data primarily came from?",
+                labels=["Text", "Table", "Figure"],
+                required=True,
+            ),
+
+            rg.TextQuestion(
+                name="extraction-correction",
+                title="Provide a correction to the extracted data:",
+                required=False,
+                use_table=True,
+            ),
+            rg.TextQuestion(
+                name="notes",
+                title="Note any special case here or justify decisions made in the extraction:",
+                required=False,
+                use_markdown=True,
+            ),
+            *(questions or [])
+        ],
+        vectors_settings=vectors_settings,
+        metadata_properties=[
+            rg.TermsMetadataProperty(
+                name="reference",
+                title="Reference",
+                visible_for_annotators=True),
+            rg.TermsMetadataProperty(
+                name="type",
+                title="Question Type",
+                visible_for_annotators=True),
+            *(metadata_properties or [])
+        ],
+    )
+
+    return extraction_dataset
