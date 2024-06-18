@@ -65,23 +65,3 @@ def stage_for_validate(df: pd.DataFrame,
     return df
 
 
-def prepend_reference_to_index_level(df: pd.DataFrame, schema: pa.DataFrameSchema, prefix_index_name: str):
-    if not df.index.names or prefix_index_name not in df.index.names:
-        return df
-
-    new_index = df.index.to_frame(index=False)
-    prefix_index_level = df.index.names.index(prefix_index_name)
-
-    for level, level_name in enumerate(df.index.names):
-        if level_name == prefix_index_name or level_name not in schema.index.names:
-            continue
-
-        if df.index.get_level_values(level_name).duplicated().any():
-            # Prepend the index level values with the values in `prefix_index_name`
-            new_index[level_name] = df.index.get_level_values(prefix_index_level).astype(
-                str) + '-' + df.index.get_level_values(level).astype(str)
-            print(new_index[level_name].shape, new_index[level_name].duplicated().sum())
-
-    df.index = pd.MultiIndex.from_frame(new_index)
-
-    return df

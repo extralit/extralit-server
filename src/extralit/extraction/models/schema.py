@@ -131,8 +131,9 @@ class SchemaStructure(BaseModel):
     def downstream_dependencies(self) -> Dict[str, List[str]]:
         dependencies = {}
         for schema in self.schemas:
-            dependencies[schema.name] = [dep.name for dep in self.schemas \
-                                         if f"{schema.name}_ref".lower() in dep.index.names]
+            dependencies[schema.name] = [
+                dep.name for dep in self.schemas \
+                if dep.index and f"{schema.name}_ref".lower() in dep.index.names]
         return dependencies
 
     @property
@@ -140,8 +141,9 @@ class SchemaStructure(BaseModel):
         dependencies = {}
         for schema in self.schemas:
             dependencies[schema.name] = [
-                other.name for other in self.schemas \
-                if f"{other.name}_ref".lower() in (schema.index.names or [schema.index.name])]
+                other.name \
+                for other in self.schemas \
+                if schema.index and f"{other.name}_ref".lower() in (schema.index.names or [schema.index.name])]
 
         return dependencies
 
@@ -179,7 +181,8 @@ class SchemaStructure(BaseModel):
         raise KeyError(f"No schema found for '{item}'")
 
     def __repr_args__(self):
-        args = [(s.name, (s.index.names or [s.index.name]) + list(s.columns)) for s in self.schemas]
+        args = [(s.name, ((s.index.names or [s.index.name]) if s.index else []) + list(s.columns)) \
+                for s in self.schemas]
         return args
 
     class Config:

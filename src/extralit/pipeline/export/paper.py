@@ -23,6 +23,8 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
     """
     Push the extractions to the Argilla (Preprocessing) FeedbackDataset.
     """
+    assert isinstance(dataset, RemoteFeedbackDataset) or dataset is None, \
+        f"dataset must be an instance of RemoteFeedbackDataset, given {type(dataset)}"
     records = []
     for ref, extractions in paper_extractions.items():
         paper = papers.loc[[ref]].iloc[0]
@@ -41,13 +43,13 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
         metadata = {
             'reference': ref,
             **({"pmid": doc.pmid} if isinstance(doc.pmid, str) else {}),
-            **({"doc_id": str(doc.id)} if doc.id is not None else {}),
+            **({"doc_id": str(doc.id)} if doc.id else {}),
         }
 
         schema_order = extractions.schemas.ordering
         for schema_name, extraction in extractions.items():
             schema = extractions.schemas[schema_name]
-            if extraction is None or extraction.empty and False:
+            if extraction is None or extraction.empty:
                 _LOGGER.warning(f'No {schema_name} extraction for {ref}, generating an empty table.')
                 extraction = generate_empty_extraction(schema, size=2)
 
@@ -179,7 +181,7 @@ def create_publication_records(
     return records
 
 
-def generate_empty_extraction(schema: pa.DataFrameSchema, size=1) -> pd.DataFrame:
+def generate_empty_extraction(schema: pa.DataFrameSchema, size=2) -> pd.DataFrame:
     default_value = ['NA'] * size
     df = pd.DataFrame.from_dict({col: default_value \
                                  for i, col in enumerate(schema.columns) if i < 5})
@@ -194,11 +196,14 @@ def generate_empty_extraction(schema: pa.DataFrameSchema, size=1) -> pd.DataFram
         index = pd.MultiIndex.from_tuples(
             [tuple(f'{prefix}{i+1}' for prefix in index_prefixes) for i in range(size)],
             names=index_names)
-    else:
+    elif schema.index:
         str_startswith_check = next(check for check in schema.index.checks if check.name == 'str_startswith')
         prefix = str_startswith_check.statistics['string']
-        index = pd.Index([f'{prefix}{i+1}' for i in range(size)], name=schema.index.name)
+        index = pd.Index([f'{prefix}{i+1}' for i in range(size)], name=schema.index.name if schema.index else None)
+    else:
+        index = None
 
-    df = df.set_index(index)
+    if index is not None:
+        df = df.set_index(index)
 
     return df

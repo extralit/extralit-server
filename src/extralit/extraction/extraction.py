@@ -185,7 +185,7 @@ def extract_paper(
         df = extract_schema_with_fallback(schema=schema, extractions=extractions, index=index, responses=responses,
                                           models=llm_models, verbose=verbose)
 
-        if schema.index.name:
+        if schema.index and schema.index.name:
             df = assign_unique_index(df, schema, index_name=schema.index.name, prefix=get_prefix(schema), n_digits=2)
         df = df.drop_duplicates()
 

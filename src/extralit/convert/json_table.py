@@ -162,7 +162,7 @@ def json_to_df(input: Union[str, List[Dict[str, Any]], Dict[str, Dict[str, Any]]
         return pd.DataFrame()
 
     if schema is not None:
-        index_cols = [name for name in schema.index.names if name]
+        index_cols = [name for name in (schema.index.names if schema.index else []) if name ]
         required_columns = get_required_columns(schema)
     else:
         index_cols = []

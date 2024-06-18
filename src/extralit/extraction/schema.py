@@ -191,7 +191,8 @@ def get_extraction_schema_model(
             pandera_column_to_pydantic_field(
                 index, validate_assignment=validate_assignment)
         )
-        for index in index_fields if index.name
+        for index in index_fields \
+        if (index and index.name)
     }
     if exclude_fields:
         columns = {k: v for k, v in columns.items() if k not in exclude_fields}
