@@ -11,6 +11,8 @@ from pandera.api.base.model import MetaModel
 from pandera.io import from_json, from_yaml
 from pydantic.v1 import BaseModel, Field, validator
 
+DEFAULT_SCHEMA_S3_PATH = 'schemas/'
+
 _LOGGER = logging.getLogger(__name__)
 
 class SchemaStructure(BaseModel):
@@ -54,7 +56,7 @@ class SchemaStructure(BaseModel):
         return cls(schemas=list(schemas.values()))
 
     @classmethod
-    def from_s3(cls, workspace: str, minio_client: Minio, prefix: str = 'schemas/',
+    def from_s3(cls, workspace: str, minio_client: Minio, prefix: str = DEFAULT_SCHEMA_S3_PATH,
                 exclude: List[str] = [], verbose: bool = True):
         schemas = {}
         objects = minio_client.list_objects(workspace, prefix=prefix, include_version=False)

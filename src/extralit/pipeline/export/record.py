@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import argilla as rg
 import pandas as pd
@@ -16,12 +16,28 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
-                              responses: Dict[str, ResponseResults],
                               papers: pd.DataFrame,
-                              dataset: RemoteFeedbackDataset = None) \
+                              responses: Optional[Dict[str, ResponseResults]]=None,
+                              dataset: RemoteFeedbackDataset = None,
+                              metadata: Optional[Dict[str,str]]=None) \
         -> List[rg.FeedbackRecord]:
     """
     Push the extractions to the Argilla (Preprocessing) FeedbackDataset.
+
+    Args:
+        paper_extractions: Dict[str, PaperExtraction], required
+            The extractions for each paper.
+        papers: pd.DataFrame, required
+            The papers dataframe.
+        responses: Dict[str, ResponseResults], optional
+            The responses for each paper.
+        dataset: RemoteFeedbackDataset, default=None
+            The Argilla dataset.
+        metadata: Dict[str,str], default=None
+            Additional metadata to add to the records.
+
+    Returns:
+        List[rg.FeedbackRecord]
     """
     assert isinstance(dataset, RemoteFeedbackDataset) or dataset is None, \
         f"dataset must be an instance of RemoteFeedbackDataset, given {type(dataset)}"
@@ -40,11 +56,12 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
             doc = rg.Document(file_name='/')
 
         ### metadata ###
-        metadata = {
-            'reference': ref,
-            **({"pmid": doc.pmid} if isinstance(doc.pmid, str) else {}),
-            **({"doc_id": str(doc.id)} if doc.id else {}),
-        }
+        metadata = metadata or {}
+        metadata['reference'] = ref
+        if isinstance(doc.pmid, str):
+            metadata['pmid'] = doc.pmid
+        if doc.doi:
+            metadata['doi'] = doc.doi
 
         schema_order = extractions.schemas.ordering
         for schema_name, extraction in extractions.items():
@@ -71,7 +88,7 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
             fields['metadata'] = f'Paper: {ref}\n' + nav_df.to_markdown(index=True)
 
             # Retrieve most relevant context
-            if ref in responses and schema_name in responses[ref].items:
+            if responses and ref in responses and schema_name in responses[ref].items:
                 nodes_df = responses[ref].items[schema_name].get_nodes_info()
                 nodes_df.drop(columns=nodes_df.columns.difference(['relevance', 'header', 'page_number', 'text']),
                               errors='ignore', inplace=True)

@@ -33,7 +33,8 @@ class PaperExtraction(BaseModel):
         df = self[schema_name].copy()
 
         # For each '_ref' key, find the matching DataFrame with the same DataFrameModel prefix
-        for ref_column in (schema.index.names[::-1] if schema.index else []):
+        index_names = schema.index.names[::-1] if schema.index else []
+        for ref_column in index_names:
             dep_schema_name = ref_column.rsplit('_ref', 1)[0].lower()
             if ref_column not in df.index.names and ref_column not in df.columns:
                 # Skip if the DataFrame is already joined

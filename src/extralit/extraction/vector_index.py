@@ -76,7 +76,7 @@ def create_local_index(paper: pd.Series,
 
 def create_vector_index(paper: pd.Series,
                         weaviate_client: WeaviateClient,
-                        preprocessing_dataset: rg.FeedbackDataset,
+                        preprocessing_dataset: Optional[rg.FeedbackDataset] = None,
                         preprocessing_path='data/preprocessing/nougat/',
                         index_name: Optional[str] = "LlamaIndexDocumentSections",
                         embed_model='text-embedding-3-small',
@@ -97,7 +97,7 @@ def create_vector_index(paper: pd.Series,
         )
 
     print(
-        f"Creating index with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
+        f"Creating index {paper.name} with {len(text_documents)} text and {len(table_documents)} table segments at Weaviate index_name: {index_name}")
     vector_store = WeaviateVectorStore(weaviate_client=weaviate_client, index_name=index_name)
     if vectordb_contains_any(paper.name, weaviate_client=weaviate_client, index_name=index_name) and overwrite:
         filters = MetadataFilters(

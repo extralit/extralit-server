@@ -107,11 +107,10 @@ class SegmentsAlignment(BaseModel):
 
         suggestions = copy.deepcopy(suggestions) or []
 
-        if self.type == 'text':
-            print('Skipped', self.type, self.extractions)
+        if self.type.lower() == 'text':
             pass
 
-        elif self.type in ['table', 'figure']:
+        elif self.type.lower() in ['table', 'figure']:
             for source, segment in self.extractions.items():
                 if segment.summary:
                     fields['header'] += f'{CHUNK_DELIM}{segment.summary}'
@@ -132,7 +131,7 @@ class SegmentsAlignment(BaseModel):
                 fields["image"] = image_to_html(self.image)
 
         else:
-            print('Skipped', self.type, self.extractions)
+            print('Skipped', self.type, metadata, self.extractions.keys())
 
         # Metadata
         metadata = copy.deepcopy(metadata) or {}
