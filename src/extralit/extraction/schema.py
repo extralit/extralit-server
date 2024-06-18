@@ -191,14 +191,18 @@ def get_extraction_schema_model(
             pandera_column_to_pydantic_field(
                 index, validate_assignment=validate_assignment)
         )
-        for index in index_fields
+        for index in index_fields if index.name
     }
     if exclude_fields:
         columns = {k: v for k, v in columns.items() if k not in exclude_fields}
         indexes = {k: v for k, v in indexes.items() if k not in exclude_fields}
 
     if not singleton:
-        lower_level_model = create_model(__model_name=lower_class, **indexes, **columns)
+        lower_level_model = create_model(
+            __model_name=lower_class,
+            **indexes,
+            **columns
+        )
         top_level_model = create_model(
             __model_name=top_class,
             __base__=SchemaStructuredOutputResponseModel,

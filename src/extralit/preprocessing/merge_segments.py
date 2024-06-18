@@ -20,7 +20,7 @@ from extralit.preprocessing.tables import SAMPLE_HTML_TABLE
 class Alignments(BaseModel):
     items: List['SegmentsAlignment'] = Field(default_factory=list, description="List of SegmentsAlignment objects")
 
-    def to_records(self, dataset: rg.FeedbackDataset, fill_missing_tables=True, **kwargs) -> List[rg.FeedbackRecord]:
+    def to_records(self, dataset: rg.FeedbackDataset, fill_missing_tables=False, **kwargs) -> List[rg.FeedbackRecord]:
         records = [item.to_record(dataset=dataset, **kwargs) for item in self.items]
         records = [record for record in records if record is not None]
 
@@ -107,12 +107,11 @@ class SegmentsAlignment(BaseModel):
 
         suggestions = copy.deepcopy(suggestions) or []
 
-        if self.type == TextSegment.__name__:
-            # fields["text-1"] = self.llmsherpa[0].text if self.llmsherpa else None
-            # fields["text-2"] = self.unstructured[0].text if self.unstructured else None
+        if self.type == 'text':
+            print('Skipped', self.type, self.extractions)
             pass
 
-        elif self.type in [TableSegment.__name__, FigureSegment.__name__]:
+        elif self.type in ['table', 'figure']:
             for source, segment in self.extractions.items():
                 if segment.summary:
                     fields['header'] += f'{CHUNK_DELIM}{segment.summary}'
@@ -132,25 +131,8 @@ class SegmentsAlignment(BaseModel):
             if isinstance(self.image, str) and os.path.exists(self.image):
                 fields["image"] = image_to_html(self.image)
 
-        # Suggestion
-        options = list(set(fields.keys()).intersection({'text-1', 'text-2', 'text-3', 'text-4', 'text-5'}))
-        if options:
-            suggestions.extend([
-                {"question_name": "ranking",
-                 "value": options,
-                 "type": "selection"},
-                {"question_name": "mismatched",
-                 "value": options,
-                 "type": "selection"},
-            ])
-        elif len(options) == 1 and not any(fields['question_name'] == 'ranking' for fields in suggestions):
-            only_option = options.pop()
-            suggestions.append({
-                "question_name": "ranking",
-                "value": only_option,
-                "type": "model",
-            })
-        suggestions = tuple() if not suggestions else tuple(suggestions)
+        else:
+            print('Skipped', self.type, self.extractions)
 
         # Metadata
         metadata = copy.deepcopy(metadata) or {}
@@ -165,11 +147,7 @@ class SegmentsAlignment(BaseModel):
         if dataset.field_by_name('metadata') and not fields.get('metadata'):
             fields['metadata'] = pd.DataFrame.from_dict(metadata, orient='index').T.to_markdown(index=False)
 
-        try:
-            record = rg.FeedbackRecord(fields=fields, suggestions=suggestions, metadata=metadata, **kwargs)
-        except Exception as e:
-            print(e)
-            print(fields, suggestions, metadata)
+        record = rg.FeedbackRecord(fields=fields, metadata=metadata, **kwargs)
 
         return record
 

@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Dict, List
 
 import argilla as rg
@@ -27,10 +28,9 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
         paper = papers.loc[[ref]].iloc[0]
 
         if dataset is not None:
-            assert isinstance(dataset, RemoteFeedbackDataset)
             if isinstance(paper.file_path, str):
                 doc = dataset.add_document(
-                    rg.Document.from_file(paper.file_path, reference=ref, pmid=paper.pmid, doi=paper.doi,
+                    rg.Document.from_file(paper.file_path, reference=ref, pmid=paper.get('pmid'), doi=paper.get('doi'),
                                           id=paper.get('id')))
             else:
                 raise Exception(f'Unable to load document for {ref}')
@@ -47,7 +47,7 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
         schema_order = extractions.schemas.ordering
         for schema_name, extraction in extractions.items():
             schema = extractions.schemas[schema_name]
-            if extraction is None or extraction.empty:
+            if extraction is None or extraction.empty and False:
                 _LOGGER.warning(f'No {schema_name} extraction for {ref}, generating an empty table.')
                 extraction = generate_empty_extraction(schema, size=2)
 
@@ -100,12 +100,14 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
 def create_publication_records(
         papers: pd.DataFrame,
         schema: pa.DataFrameSchema,
+        dataset: RemoteFeedbackDataset,
         embed_model='text-embedding-3-large',
-        dataset: RemoteFeedbackDataset = None) \
+        ) \
         -> List[rg.FeedbackRecord]:
     """
     Push the publications to the Argilla (Preprocessing) FeedbackDataset.
     """
+    assert papers.index.name == 'reference', f"The given dataframe must have index name as 'reference', given {papers.index.name}"
     records = []
     question_names = [q.name for q in dataset.questions]
 
@@ -115,42 +117,38 @@ def create_publication_records(
             embed_models[vectors_setting.name] = OpenAIEmbedding(
                 model=embed_model, dimensions=vectors_setting.dimensions or 1024)
 
-    for _, paper in tqdm(papers.iterrows()):
+    for reference, paper in tqdm(papers.iterrows()):
         if dataset is not None:
             assert isinstance(dataset, RemoteFeedbackDataset)
             if isinstance(paper.file_path, str):
                 doc = dataset.add_document(
-                    rg.Document.from_file(paper.file_path, reference=paper.name, pmid=paper.pmid, doi=paper.doi,
-                                          id=paper.id if hasattr(paper, 'id') else None))
+                    rg.Document.from_file(paper.file_path,
+                                          reference=str(reference),
+                                          pmid=paper.get('pmid'),
+                                          doi=paper.get('doi'),
+                                          id=paper.get('id', uuid.uuid4())))
             else:
-                raise Exception(f'Unable to load document for {paper.name}')
+                raise Exception(f'Unable to load document for {paper.name} from {paper.file_path}')
         else:
             doc = rg.Document(file_name='/')
 
         metadata = {
             'reference': paper.name,
-            **({"pmid": doc.pmid} if isinstance(doc.pmid, str) else {}),
             **({"doc_id": str(doc.id)} if doc.id is not None else {}),
         }
 
-        publication_metadata = {
-            'title': paper.title,
-            'authors': ', '.join([f"{author.get('first_name')} {author.get('last_name')}".strip() \
-                                  for author in paper.authors]),
-            'journal': paper.source,
-            'year': paper.year,
-            'doi': paper.doi,
-            'pmid': paper.pmid,
-            'keywords': paper.keywords,
-            'collections': paper.collections,
-        }
+        dataset_field_names = [f.name for f in dataset.fields]
+        publication_metadata = {k: v for k,v in paper.to_dict().items() \
+                                if k in dataset_field_names}
         metadata.update(publication_metadata)
         publication_metadata = pd.Series(publication_metadata, name=paper.name)
 
         fields = {
-            'metadata': publication_metadata.to_frame().to_html(index=True),
-            'abstract': paper.abstract or "",
+            **{k: v for k, v in paper.to_dict().items() \
+               if k in dataset_field_names and not pd.isna(v)},
         }
+        if 'metadata' in dataset_field_names:
+            fields['metadata'] = publication_metadata.to_frame().to_html(index=True)
 
         vectors = {
             name: model.get_text_embedding(fields[name]) \
@@ -159,10 +157,7 @@ def create_publication_records(
         }
 
         # Create suggestions
-        try:
-            agent = paper['Check_out_by'].strip() or None
-        except AttributeError:
-            agent = None
+        agent = None
         suggestions = []
         for field in schema.columns:
             if field in question_names and field in paper and paper[field] is not None:

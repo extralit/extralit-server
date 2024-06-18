@@ -8,9 +8,10 @@ import pandera as pa
 def pandera_schema_to_argilla_dataset(
         schema: pa.DataFrameSchema,
         papers: pd.DataFrame,
-        fields: List[rg.TextField],
+        fields: List[rg.TextField] = None,
         vectors_settings: List[rg.VectorSettings] = None,
         **kwargs) -> rg.FeedbackDataset:
+    fields = fields or []
     questions = []
     metadata_properties = {}
 
@@ -49,6 +50,9 @@ def pandera_schema_to_argilla_dataset(
             metadata_prop = rg.TermsMetadataProperty(name=column_name, title=column_name.capitalize(), visible_for_annotators=True)
 
         metadata_properties[column_name] = metadata_prop
+
+    if not any(field.name == 'metadata' for field in fields):
+        fields.insert(0, rg.TextField(name="metadata", title="Metadata", use_markdown=True))
 
     return rg.FeedbackDataset(
         fields=fields,
