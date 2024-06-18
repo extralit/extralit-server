@@ -7,13 +7,13 @@ kindV1Alpha4Cluster:
   nodes:
   - role: control-plane
     extraMounts:
-    - hostPath: /Users/jonnytr/kind-volumes/elasticsearch
+    - hostPath: /tmp/kind-volumes/elasticsearch
       containerPath: /usr/share/elasticsearch/data
-    - hostPath: /Users/jonnytr/kind-volumes/postgresql
+    - hostPath: /tmp/kind-volumes/postgresql
       containerPath: /var/lib/postgresql/data
   - role: worker
     extraMounts:
-    - hostPath: /Users/jonnytr/kind-volumes/elasticsearch-worker
+    - hostPath: /tmp/kind-volumes/elasticsearch-worker
       containerPath: /usr/share/elasticsearch/data
-    - hostPath: /Users/jonnytr/kind-volumes/postgresql-worker
+    - hostPath: /tmp/kind-volumes/postgresql-worker
       containerPath: /var/lib/postgresql/data
