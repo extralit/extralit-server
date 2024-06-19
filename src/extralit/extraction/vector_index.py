@@ -144,14 +144,10 @@ def create_vector_index(paper: pd.Series,
     for node in text_nodes:
         if has_existing_node and overwrite != 'text':
             continue
-        print(
-            f"{paper.name}: Adding {len(text_nodes)} text segments at Weaviate index_name: {index_name}")
         loaded_index.insert(node)
     for node in table_nodes:
         if has_existing_node and overwrite != 'table':
             continue
-        print(
-            f"{paper.name}: Adding {len(table_nodes)} table segments at Weaviate index_name: {index_name}")
         loaded_index.insert(node, node_parser=JSONNodeParser(chunk_size=chunk_size, chunk_overlap=chunk_overlap))
 
     if verbose:

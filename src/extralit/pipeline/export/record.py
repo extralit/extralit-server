@@ -58,6 +58,8 @@ def create_extraction_records(paper_extractions: Dict[str, PaperExtraction],
         ### metadata ###
         metadata = metadata or {}
         metadata['reference'] = ref
+        if doc.id:
+            metadata['doc_id'] = str(doc.id)
         if isinstance(doc.pmid, str):
             metadata['pmid'] = doc.pmid
         if doc.doi:

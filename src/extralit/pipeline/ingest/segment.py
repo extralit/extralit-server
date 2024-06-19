@@ -41,7 +41,7 @@ def get_paper_tables(paper: pd.Series,
                                  answers=['text-correction', 'header-correction', 'footer-correction', 'ranking',
                                           'duration'],
                                  metadatas=['page_number', 'number'],
-                                 status=['discarded'])
+                                 status=response_status)
         if 'ranking' not in values or values['ranking'] == 'none':
             continue
 
