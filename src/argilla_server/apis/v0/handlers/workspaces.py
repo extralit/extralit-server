@@ -43,14 +43,15 @@ async def create_workspace(
     await authorize(current_user, WorkspacePolicy.create)
 
     try:
-        workspace = await accounts.create_workspace(db, workspace_create.dict())
-    except NotUniqueError:
-        raise EntityAlreadyExistsError(name=workspace_create.name, type=Workspace)
+        files.create_bucket(minio_client, workspace_create.name)
+    except Exception as e:
+        raise e
 
     try:
-        await files.create_bucket(minio_client, workspace.name)
-    except Exception as e:
-        print(type(e), e)
+        workspace = await accounts.create_workspace(db, workspace_create.dict())
+    except NotUniqueError:
+        await files.delete_bucket(minio_client, workspace_create.name)
+        raise EntityAlreadyExistsError(name=workspace_create.name, type=Workspace)
 
     return Workspace.from_orm(workspace)
 

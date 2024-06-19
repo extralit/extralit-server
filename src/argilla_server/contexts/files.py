@@ -4,6 +4,9 @@ import os
 from typing import Any, BinaryIO, Dict, List, Optional, Union
 from urllib.parse import urlparse
 from uuid import UUID
+
+from minio.commonconfig import ENABLED
+
 from argilla_server.schemas.v1.files import ListObjectsResponse, ObjectMetadata, FileObjectResponse
 from argilla_server.settings import settings
 from fastapi import HTTPException
@@ -11,6 +14,8 @@ from minio import Minio, S3Error
 from minio.helpers import ObjectWriteResult
 from minio.versioningconfig import VersioningConfig
 from minio.datatypes import Object
+
+EXCLUDED_VERSIONING_PREFIXES = ['pdf']
 
 _LOGGER = logging.getLogger("argilla")
 
@@ -129,12 +134,15 @@ def delete_object(client: Minio, bucket: str, object: str, version_id: Optional[
         raise e
 
 
-def create_bucket(client: Minio, workspace_name: str):
+def create_bucket(client: Minio, workspace_name: str, excluded_prefixes: List[str]= EXCLUDED_VERSIONING_PREFIXES):
     try:
         client.make_bucket(workspace_name)
-        client.set_bucket_versioning(workspace_name, VersioningConfig(VersioningConfig.ENABLED, 
-                                                                      excluded_prefixes=['pdf/'], 
-                                                                      exclude_folders=True))
+        try:
+            client.set_bucket_versioning(workspace_name, VersioningConfig(ENABLED, excluded_prefixes=excluded_prefixes, exclude_folders=True))
+        except Exception as e:
+            _LOGGER.error(f"Error setting versioning for bucket {workspace_name}: {e}")
+            delete_bucket(client, workspace_name)
+            raise e
     except S3Error as se:
         if se.code == "BucketAlreadyOwnedByYou":
             pass
