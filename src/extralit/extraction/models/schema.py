@@ -31,6 +31,15 @@ class SchemaStructure(BaseModel):
 
     @classmethod
     def from_dir(cls, dir_path: str, exclude: List[str]=[]):
+        """
+        Load a SchemaStructure from a directory containing pandera DataFrameSchema .json files.
+        Args:
+            dir_path: A directory path containing pandera DataFrameSchema .json files.
+            exclude: A list of schema names to exclude from the schema structure.
+
+        Returns:
+            SchemaStructure
+        """
         schemas = {}
         if os.path.isdir(dir_path):
             schema_paths = sorted(glob(os.path.join(dir_path, '*.json')), key=lambda x: not x.endswith('.json'))
@@ -58,6 +67,19 @@ class SchemaStructure(BaseModel):
     @classmethod
     def from_s3(cls, workspace: str, minio_client: Minio, prefix: str = DEFAULT_SCHEMA_S3_PATH,
                 exclude: List[str] = [], verbose: bool = True):
+        """
+        Load a SchemaStructure from a Minio bucket containing pandera DataFrameSchema .json files.
+
+        Args:
+            workspace:  The workspace name.
+            minio_client:  The Minio client.
+            prefix: The prefix to search for schemas.
+            exclude:  A list of schema names to exclude from the schema structure.
+            verbose:  Whether to log verbose output.
+
+        Returns:
+            SchemaStructure
+        """
         schemas = {}
         objects = minio_client.list_objects(workspace, prefix=prefix, include_version=False)
 
@@ -90,7 +112,20 @@ class SchemaStructure(BaseModel):
 
         return cls(schemas=list(schemas.values()))
 
-    def to_s3(self, workspace: str, minio_client: Minio, prefix: str = 'schemas/'):
+    def to_s3(self, workspace: str, minio_client: Minio, prefix: str = 'schemas/', delete_excluded: bool = False):
+        """
+        This method is used to upload the schemas to an S3 bucket and optionally delete the excluded schemas.
+
+        Args:
+            workspace (str): The workspace name.
+            minio_client (Minio): The Minio client.
+            prefix (str, optional): The prefix to use for the schemas in the S3 bucket. Default is 'schemas/'.
+            delete_excluded (bool, optional): A flag to determine whether to delete the excluded schemas or not. Default is True.
+
+        Returns:
+            None
+        """
+
         for schema in self.schemas:
             # Serialize the schema to a JSON string
             schema_json = schema.to_json()
@@ -109,6 +144,15 @@ class SchemaStructure(BaseModel):
                 length=schema_bytes.getbuffer().nbytes,
                 content_type='application/json'
             )
+
+        if delete_excluded:
+            objects = minio_client.list_objects(workspace, prefix=prefix, include_version=False)
+            bucket_schema_paths = [os.path.splitext(obj.object_name)[0] for obj in objects]
+            self_schema_paths = [os.path.join(prefix, schema.name) for schema in self.schemas]
+            schemas_to_delete = set(bucket_schema_paths) - set(self_schema_paths)
+            print('Deleting schemas:', schemas_to_delete)
+            for schema_path in schemas_to_delete:
+                minio_client.remove_object(workspace, schema_path)
 
     def get_joined_schema(self, schema_name: str):
         combined_columns = {}
@@ -131,26 +175,44 @@ class SchemaStructure(BaseModel):
 
     @property
     def downstream_dependencies(self) -> Dict[str, List[str]]:
-        dependencies = {}
+        dependents = {}
         for schema in self.schemas:
-            dependencies[schema.name] = [
-                dep.name for dep in self.schemas \
-                if dep.index and f"{schema.name}_ref".lower() in dep.index.names]
-        return dependencies
+            dependents[schema.name] = []
+            schema_index_names = self.index_names(schema)
+
+            for dep in self.schemas:
+                if not dep.index or schema == dep: continue
+                dep_index_names = self.index_names(dep)
+                if f"{schema.name}_ref".lower() in dep_index_names:
+                    dependents[schema.name].append(dep.name)
+
+                if schema.index and f"{schema.name}_ID" in dep_index_names and f"{schema.name}_ID" in schema_index_names:
+                    dependents[schema.name].append(dep.name)
+        return dependents
 
     @property
     def upstream_dependencies(self) -> Dict[str, List[str]]:
         dependencies = {}
         for schema in self.schemas:
-            dependencies[schema.name] = [
-                other.name \
-                for other in self.schemas \
-                if schema.index and f"{other.name}_ref".lower() in (schema.index.names or [schema.index.name])]
+            dependencies[schema.name] = []
+            schema_index_names = self.index_names(schema)
 
+            for dep in self.schemas:
+                if not schema.index or schema == dep: continue
+                dep_index_names = self.index_names(dep)
+                if f"{dep.name}_ref".lower() in schema_index_names:
+                    dependencies[schema.name].append(dep.name)
+
+                if dep.index and f"{dep.name}_ID" in schema_index_names and f"{dep.name}_ID" in dep_index_names:
+                    dependencies[schema.name].append(dep.name)
         return dependencies
 
-    def index_names(self, schema: str) -> List[str]:
-        return list(self.__getitem__(schema).index.names or [self.__getitem__(schema).index.name])
+    def index_names(self, schema: Union[str, pa.DataFrameSchema]) -> List[str]:
+        schema = self.__getitem__(schema) if isinstance(schema, str) else schema
+        if not schema.index: return []
+        index_names = list(schema.index.names or [schema.index.name])
+        index_names = [name for name in index_names if name]
+        return index_names
 
     def columns(self, schema: str) -> List[str]:
         columns = list(self.__getitem__(schema).columns)

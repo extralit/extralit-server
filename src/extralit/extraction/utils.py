@@ -21,6 +21,9 @@ def convert_response_to_dataframe(response: Response) -> pd.DataFrame:
 
 
 def generate_reference_columns(df: pd.DataFrame, schema: pa.DataFrameSchema):
+    if schema.index is None:
+        return df
+
     index_names = [index.name.lower() for index in schema.index.indexes] \
         if hasattr(schema.index, 'indexes') else []
     for index_name in index_names:
