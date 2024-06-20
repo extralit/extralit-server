@@ -214,6 +214,12 @@ class SchemaStructure(BaseModel):
         index_names = [name for name in index_names if name]
         return index_names
 
+    def get_ref_schema(self, ref_column: str) -> pa.DataFrameSchema:
+        if not ref_column.endswith('_ref') and not ref_column.endswith('_ID'):
+            raise ValueError(f"Foreign key '{ref_column}' must contain '_ref' or '_ID' suffix")
+        schema_name = ref_column.rsplit('_ref', 1)[0].rsplit('_ID', 1)[0]
+        return self.__getitem__(schema_name)
+
     def columns(self, schema: str) -> List[str]:
         columns = list(self.__getitem__(schema).columns)
         return columns

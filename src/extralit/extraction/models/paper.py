@@ -28,14 +28,23 @@ class PaperExtraction(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def get_joined_data(self, schema_name: str, drop_joined_index=True, index_name='reference') -> pd.DataFrame:
+    def get_joined_data(self, schema_name: str, drop_joined_index=True) -> pd.DataFrame:
+        """
+        Join the extraction DataFrame with the dependent DataFrames based on the schema index.
+        Args:
+            schema_name:  The schema name to join.
+            drop_joined_index:  Drop the joined index column.
+            index_name: The index name to join on.
+
+        Returns:
+
+        """
         schema = self.schemas[schema_name]
         df = self[schema_name].copy()
 
         # For each '_ref' key, find the matching DataFrame with the same DataFrameModel prefix
-        index_names = schema.index.names[::-1] if schema.index else []
-        for ref_column in index_names:
-            dep_schema_name = ref_column.rsplit('_ref', 1)[0].lower()
+        for ref_column in self.schemas.index_names(schema_name):
+            dep_schema_name = self.schemas.get_ref_schema(ref_column).name
             if ref_column not in df.index.names and ref_column not in df.columns:
                 # Skip if the DataFrame is already joined
                 _LOGGER.info(f"Skipping join on {ref_column} as it is already joined. \n{df.index.names}\n{df.columns}")
@@ -43,14 +52,13 @@ class PaperExtraction(BaseModel):
 
             dependent_df = next(
                 (value.copy() for key, value in self.extractions.items() \
-                 if str(key).lower() == dep_schema_name and value.size > 0),
+                 if str(key).lower() == dep_schema_name.lower() and value.size > 0),
                 None)
-
             if dependent_df is None:
                 continue
 
             try:
-                dependent_df = dependent_df.rename_axis(index={index_name: ref_column})
+                dependent_df = dependent_df.rename_axis(index={'reference': ref_column})
                 df = df.join(dependent_df, how='left', rsuffix='_joined')
                 df = overwrite_joined_columns(df, rsuffix='_joined', prepend=True)
                 if drop_joined_index and ref_column in df.index.names:
