@@ -101,6 +101,7 @@ nlp = [
 ]
 ocr = [
     "nougat-ocr[api]",
+    "timm == 0.5.4",
     "transformers ~= 4.25.1"
 ]
 pdf = [

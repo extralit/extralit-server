@@ -95,13 +95,13 @@ k8s_resource(
     labels=['extralit'],
 )
 
-# Vector-Admin 
-k8s_yaml('./k8s/vector-admin-deployment.yaml')
-k8s_resource(
-    'vector-admin-deployment',
-    port_forwards=['3001:3001'],
-    labels=['extralit'],
-)
+# # Vector-Admin 
+# k8s_yaml('./k8s/vector-admin-deployment.yaml')
+# k8s_resource(
+#     'vector-admin-deployment',
+#     port_forwards=['3001:3001'],
+#     labels=['extralit'],
+# )
 
 
 # Aimstack Observability server
