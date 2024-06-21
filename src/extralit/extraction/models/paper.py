@@ -57,6 +57,10 @@ class PaperExtraction(BaseModel):
             if dependent_df is None:
                 continue
 
+            if self.user_id.get(dep_schema_name) and self.user_id.get(dep_schema_name) == self.user_id.get(schema_name):
+                print(f"Skipping join on {dep_schema_name} as it is the same user.")
+                _LOGGER.info(f"Skipping join on {dep_schema_name} as it is the same user.")
+
             try:
                 dependent_df = dependent_df.rename_axis(index={'reference': ref_column})
                 df = df.join(dependent_df, how='left', rsuffix='_joined')

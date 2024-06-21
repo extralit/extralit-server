@@ -178,7 +178,7 @@ class LabelSelectionQuestionSettingsCreate(UniqueValuesCheckerMixin):
         visible_options = values.get("visible_options")
         if visible_options is not None:
             num_options = len(values["options"])
-            if visible_options > num_options:
+            if visible_options > num_options and "dynamic" not in values.get("type", ''):
                 raise ValueError(
                     "the value for 'visible_options' must be less or equal to the number of items in 'options'"
                     f" ({num_options})"
