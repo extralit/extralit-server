@@ -3,6 +3,7 @@ import os.path
 from collections import Counter
 from os.path import join
 from typing import Optional, Literal
+import warnings
 
 import argilla as rg
 import pandas as pd
@@ -22,6 +23,7 @@ from extralit.extraction.vector_store import WeaviateVectorStore
 
 DEFAULT_RETRIEVAL_MODE = OpenAIEmbeddingMode.TEXT_SEARCH_MODE
 _LOGGER = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def create_local_index(paper: pd.Series,
