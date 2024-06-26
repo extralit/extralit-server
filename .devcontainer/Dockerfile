@@ -28,12 +28,12 @@ RUN CTLPTL_VERSION="0.8.29" && \
     tar -xzv -C /usr/local/bin ctlptl
 
 # Setup micromamba
-RUN curl -L -O "https://micromamba.snakepit.net/api/micromamba/linux-64/latest" && \
-    mv latest micromamba && \
-    chmod +x micromamba && \
-    ./micromamba shell init -s bash -p ~/micromamba && \
-    rm micromamba && \
-    echo 'micromamba create -n dev-env python=3.10 uv -c conda-forge' >> ~/.bashrc
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba && \
+    export MAMBA_ROOT_PREFIX=~/micromamba && \
+    eval "$(./bin/micromamba shell hook -s posix)" && \
+    ./bin/micromamba shell init -s bash -p ~/micromamba && \
+    micromamba activate && \
+    micromamba install python=3.10 jupyter uv -c conda-forge -y
 
 # Cleanup
 RUN rm -rf /var/cache/apk/* && \
