@@ -1,14 +1,19 @@
-# Use Docker stable as the base image
-FROM docker:stable
+# Use a Debian-based image suitable for GitHub Codespaces
+FROM debian:bullseye-slim
 
-# Install dependencies
-RUN apk add --no-cache \
+# Install necessary packages including Docker dependencies
+RUN apt-get update && apt-get install -y \
     bash \
     curl \
     git \
     ca-certificates \
-    dpkg \
-    dpkg-dev
+    gnupg \
+    lsb-release \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce docker-ce-cli containerd.io \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Tilt
 RUN curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v0.33.17/tilt.0.33.17.linux.x86_64.tar.gz | tar -xzv tilt && \
@@ -30,5 +35,4 @@ RUN CTLPTL_VERSION="0.8.29" && \
     tar -xzv -C /usr/local/bin ctlptl
 
 # Cleanup
-RUN rm -rf /var/cache/apk/* && \
-    rm -rf /tmp/*
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
