@@ -6,7 +6,9 @@ RUN apk add --no-cache \
     bash \
     curl \
     git \
-    ca-certificates
+    ca-certificates \
+    dpkg \
+    dpkg-dev
 
 # Install Tilt
 RUN curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v0.33.17/tilt.0.33.17.linux.x86_64.tar.gz | tar -xzv tilt && \
