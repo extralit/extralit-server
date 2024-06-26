@@ -27,18 +27,6 @@ RUN CTLPTL_VERSION="0.8.29" && \
     curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | \
     tar -xzv -C /usr/local/bin ctlptl
 
-# Setup micromamba
-RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba && \
-    export MAMBA_ROOT_PREFIX=~/micromamba && \
-    eval "$(./bin/micromamba shell hook -s posix)" && \
-    ./bin/micromamba shell init -s bash -p ~/micromamba && \
-    source ~/.bashrc && \
-    micromamba activate && \
-    micromamba install python=3.10 jupyter uv -c conda-forge -y
-
 # Cleanup
 RUN rm -rf /var/cache/apk/* && \
     rm -rf /tmp/*
-
-# Set the default command
-CMD ["bash"]
