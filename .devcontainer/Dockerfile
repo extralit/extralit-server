@@ -23,10 +23,9 @@ RUN curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64" && \
     mv ./kind /usr/local/bin/kind
 
 # Install ctlptl
-RUN curl -Lo ctlptl.tar.gz "https://github.com/tilt-dev/ctlptl/releases/download/v0.5.7/ctlptl_0.5.7_linux_amd64.tar.gz" && \
-    tar -xzvf ctlptl.tar.gz ctlptl && \
-    mv ctlptl /usr/local/bin/ctlptl && \
-    rm ctlptl.tar.gz
+RUN CTLPTL_VERSION="0.8.29" && \
+    curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | \
+    tar -xzv -C /usr/local/bin ctlptl
 
 # Setup micromamba
 RUN curl -L -O "https://micromamba.snakepit.net/api/micromamba/linux-64/latest" && \
