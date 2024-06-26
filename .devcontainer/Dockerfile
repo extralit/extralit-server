@@ -9,7 +9,7 @@ RUN apk add --no-cache \
     ca-certificates
 
 # Install Tilt
-RUN curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v0.23.1/tilt.0.23.1.linux.x86_64.tar.gz | tar -xzv tilt && \
+RUN curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v0.33.17/tilt.0.33.17.linux.x86_64.tar.gz | tar -xzv tilt && \
     mv tilt /usr/local/bin/tilt
 
 # Install kubectl
