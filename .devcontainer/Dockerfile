@@ -32,6 +32,7 @@ RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bi
     export MAMBA_ROOT_PREFIX=~/micromamba && \
     eval "$(./bin/micromamba shell hook -s posix)" && \
     ./bin/micromamba shell init -s bash -p ~/micromamba && \
+    source ~/.bashrc && \
     micromamba activate && \
     micromamba install python=3.10 jupyter uv -c conda-forge -y
 
