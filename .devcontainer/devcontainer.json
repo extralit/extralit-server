@@ -32,10 +32,7 @@
       "packages": "python==3.10 nodejs=18.6.0 uv pdm jupyterlab",
       "envFile": "",
       "envName": ""
-    },
-    // "ghcr.io/va-h/devcontainers-features/uv:1": {
-    // 	"version": "latest"
-    // }
+    }
   },
 
   // Use 'postCreateCommand' to run commands after the container is created.

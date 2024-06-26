@@ -152,7 +152,7 @@ jobs:
       !contains(needs.*.result, 'cancelled')
     with:
       download-python-package: true
-      image-name: argilla/argilla-server
+      image-name: extralit/extralit-server
       dockerfile: docker/server/Dockerfile
       context: docker/server
       readme: README.md
@@ -168,7 +168,7 @@ jobs:
       needs.build_server_docker_image.result == 'success'
     with:
       download-python-package: false
-      image-name: argilla/argilla-quickstart
+      image-name: extralit/extralit-quickstart
       dockerfile: docker/quickstart/Dockerfile
       context: docker/quickstart
       readme: docker/quickstart/README.md
@@ -211,7 +211,7 @@ jobs:
         run: pdm publish --no-build --repository testpypi
 
       - name: Test Installing 🍿
-        run: pip install --index-url https://test.pypi.org/simple --no-deps argilla-server==${GITHUB_REF#refs/*/v}
+        run: pip install --index-url https://test.pypi.org/simple --no-deps extralit-server==${GITHUB_REF#refs/*/v}
 
       - name: Publish Package to PyPI 🥩
         run: pdm publish --no-build
