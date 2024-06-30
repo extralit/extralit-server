@@ -7,7 +7,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && \
   apt-get install -y python-dev-is-python3 libpq-dev gcc && \
   pip install uvicorn[standard] && \
-  for wheel in /packages/*.whl; do pip install "$wheel"[server,postgresql]; done && \
+  for wheel in /packages/*.whl; do pip install "$wheel"[argilla_server,postgresql]; done && \
   apt-get remove -y python-dev-is-python3 libpq-dev gcc && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
