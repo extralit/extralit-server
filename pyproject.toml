@@ -22,14 +22,6 @@ maintainers = [
     { name = "argilla", email = "contact@argilla.io" }
 ]
 dependencies = [
-    "pydantic",
-    "rich != 13.1.0",
-    "tqdm",
-    "python-dotenv",
-]
-
-[project.optional-dependencies]
-argilla_server = [
     # Basic dependencies
     "fastapi >= 0.103.1,< 1.0.0",
     "pydantic >= 1.10.7,< 2.0",
@@ -69,19 +61,24 @@ argilla_server = [
     # For file storage
     "minio>=7.2.7",
 ]
+
+[project.optional-dependencies]
 postgresql = [
     "psycopg2 ~= 2.9.5",
     # Async PostgreSQL
     "asyncpg >=0.27.0",
 ]
 extraction = [
+    "pydantic >= 2.5.0",
+    "rich != 13.1.0",
+    "tqdm",
+    "python-dotenv",
     "minio",
     "hypothesis",
     "html5lib",
     "fastapi < 1.0.0",
-    "pydantic",
     "pypandoc ~= 1.13",
-    "weaviate-client ~= 4.5.7",
+    "weaviate-client >= 4",
     "beautifulsoup4 ~= 4.12.2",
     "pandas ~= 2.2.2",
     "pandera[io] ~= 0.19.3",
