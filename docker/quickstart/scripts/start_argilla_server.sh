@@ -38,9 +38,4 @@ fi
 
 # Start Argilla
 echo "Starting Argilla"
-echo "ARGILLA_ELASTICSEARCH: $ARGILLA_ELASTICSEARCH"
-echo "ARGILLA_DATABASE_URL: $ARGILLA_DATABASE_URL"
-echo "POSTGRES_PASSWORD: $POSTGRES_PASSWORD"
-echo "POSTGRES_HOST: $POSTGRES_HOST"
-
 python -m uvicorn argilla_server:app --host "0.0.0.0"
