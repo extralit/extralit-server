@@ -34,5 +34,8 @@ RUN CTLPTL_VERSION="0.8.29" && \
     curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | \
     tar -xzv -C /usr/local/bin ctlptl
 
+# Create a daemon.json file that disables IPv6
+RUN echo '{ "ipv6": false }' > /etc/docker/daemon.json
+
 # Cleanup
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
