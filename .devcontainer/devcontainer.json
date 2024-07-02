@@ -11,7 +11,15 @@
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-docker",
-        "tilt-dev.tilt"
+        "tilt-dev.tilt",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "github.vscode-github-actions",
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-python.vscode-pylance",
+        "tamasfe.even-better-toml",
+        "eamodio.gitlens"
       ]
     }
   },
@@ -19,7 +27,8 @@
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   "forwardPorts": [
     8000,
-    10350
+    10350,
+    5005
   ],
 
   // Features to add to the dev container. More info: https://containers.dev/features.
