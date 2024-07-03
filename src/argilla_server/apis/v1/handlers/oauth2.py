@@ -57,15 +57,18 @@ async def get_access_token(
     db: AsyncSession = Depends(get_async_db),
 ) -> Token:
     _check_oauth_enabled_or_raise()
+    print(f"Provider: {provider}")
 
     try:
         provider = _get_provider_by_name_or_raise(provider)
+        print(f"Provider: {provider}")
         user_info = UserInfo(await provider.get_user_data(request))
 
         user_info.use_claims(provider.claims)
         username = user_info.username
 
         user = await accounts.get_user_by_username(db, username)
+        print(f"User found: {user}")
         if user is None:
             user = await accounts.create_user_with_random_password(
                 db,
@@ -74,15 +77,19 @@ async def get_access_token(
                 role=_USER_ROLE_ON_CREATION,
                 workspaces=[workspace.name for workspace in settings.oauth.allowed_workspaces],
             )
+            print(f"User created: {user.username}")
             telemetry.track_user_created(user, is_oauth=True)
         elif not _is_user_created_by_oauth_provider(user):
             # User should sign in using username/password workflow
+            print(f"User {user.username} should sign in using username/password workflow")
             raise AuthenticationError("Could not authenticate user")
 
         return Token(access_token=JWT.create(user_info))
     except ValueError as e:
+        raise e
         raise HTTPException(status_code=400, detail=str(e))
     except AuthenticationError as e:
+        raise e
         raise HTTPException(status_code=401, detail=str(e))
 
 
