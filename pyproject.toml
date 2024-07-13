@@ -66,9 +66,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-postgresql = [
-    
-]
 extraction = [
     "pydantic >= 2.5.0",
     "rich != 13.1.0",

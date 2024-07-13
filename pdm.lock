@@ -2,10 +2,10 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "test", "postgresql"]
+groups = ["default", "test"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.2"
-content_hash = "sha256:a09174de5312196f1275fc260983d82aaeeedcf4cd2c8e1f044b4e1f2544ff96"
+content_hash = "sha256:31c0d63359609c8b642abd2e78ae053e5b68666b86a2e7ba60f0513992e506a4"
 
 [[package]]
 name = "aiofiles"
