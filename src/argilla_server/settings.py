@@ -175,7 +175,10 @@ class Settings(BaseSettings):
                 )
                 return re.sub(regex, "sqlite+aiosqlite", database_url)
 
-        if "postgresql" in database_url:
+        if "postgres" in database_url:
+            if "postgres://" in database_url:
+                raise ValueError("The database URL must use 'postgresql://' protocol, not 'postgres://'.")
+
             regex = re.compile(r"postgresql(?!\+asyncpg)(\+psycopg2)?")
             if regex.match(database_url):
                 warnings.warn(

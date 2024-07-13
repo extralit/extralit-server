@@ -19,6 +19,7 @@ def get_minio_client() -> Optional[Minio]:
         parsed_url = urlparse(s3_endpoint)
         hostname = parsed_url.hostname
         port = parsed_url.port
+        print(f"hostname: {hostname} port: {port}, scheme {parsed_url.scheme}, access_key: {s3_access_key}, secret_key: {s3_secret_key}")
 
         if hostname is None:
             print(f"Invalid URL: no hostname found, possible due to lacking http(s) protocol. Given '{s3_endpoint}'")
