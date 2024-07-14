@@ -138,11 +138,10 @@ def create_bucket(client: Minio, workspace_name: str, excluded_prefixes: List[st
     try:
         client.make_bucket(workspace_name)
         try:
-            client.set_bucket_versioning(workspace_name, VersioningConfig(ENABLED, excluded_prefixes=excluded_prefixes, exclude_folders=True))
+            client.set_bucket_versioning(workspace_name, VersioningConfig(ENABLED))
         except Exception as e:
-            _LOGGER.error(f"Error setting versioning for bucket {workspace_name}: {e}")
-            delete_bucket(client, workspace_name)
-            raise e
+            _LOGGER.error(f"Error enabling versioning for bucket {workspace_name}: {e}")
+
     except S3Error as se:
         if se.code == "BucketAlreadyOwnedByYou":
             pass
