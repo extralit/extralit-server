@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "18.6"
+          node-version: "18"
       - name: Setup PDM
         uses: pdm-project/setup-pdm@v4
         with:
