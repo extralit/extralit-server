@@ -143,7 +143,7 @@ def create_bucket(client: Minio, workspace_name: str, excluded_prefixes: List[st
             _LOGGER.error(f"Error enabling versioning for bucket {workspace_name}: {e}")
 
     except S3Error as se:
-        if se.code == "BucketAlreadyOwnedByYou":
+        if se.code in ['BucketAlreadyOwnedByYou', 'BucketAlreadyExists']:
             pass
         else:
             _LOGGER.error(f"Error creating bucket {workspace_name}: {se}")
@@ -176,6 +176,7 @@ def get_pdf_s3_object_path(id: Union[UUID, str]):
         object_path = f'pdf/{id}'
 
     return object_path
+
 
 def get_s3_object_url(bucket_name:str, object_name:str)->str:
     return f'/api/v1/file/{bucket_name}/{object_name}'

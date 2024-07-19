@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from typing import List
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Security
@@ -30,7 +31,7 @@ from argilla_server.schemas.v0.workspaces import Workspace, WorkspaceCreate
 from argilla_server.security import auth
 
 router = APIRouter(tags=["workspaces"])
-
+_LOGGER = logging.getLogger("argilla")
 
 @router.post("/workspaces", response_model=Workspace, response_model_exclude_none=True)
 async def create_workspace(
@@ -50,7 +51,7 @@ async def create_workspace(
     try:
         workspace = await accounts.create_workspace(db, workspace_create.dict())
     except NotUniqueError:
-        await files.delete_bucket(minio_client, workspace_create.name)
+        _LOGGER.error(f"Could not create workspace '{workspace_create.name}': {e}")
         raise EntityAlreadyExistsError(name=workspace_create.name, type=Workspace)
 
     return Workspace.from_orm(workspace)
