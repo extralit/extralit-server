@@ -65,11 +65,6 @@ async def upload_document(
 ):
     await authorize(current_user, DocumentPolicy.create())
 
-    if document_create.file_data is not None:
-        file_data_bytes = base64.b64decode(document_create.file_data)
-    else:
-        file_data_bytes = None
-
     workspace = await accounts.get_workspace_by_id(db, document_create.workspace_id)
     if not workspace:
         raise HTTPException(
@@ -77,9 +72,10 @@ async def upload_document(
             detail=f"Workspace with id `{document_create.workspace_id}` not found",
         )
     
-    existing_files = files.list_objects(client, workspace.name, prefix=str(document_create.id), include_version=False)
-    if not existing_files.objects and file_data_bytes is not None:
-        object_path = files.get_pdf_s3_object_path(document_create.id)
+    object_path = files.get_pdf_s3_object_path(document_create.id)
+    existing_files = files.list_objects(client, workspace.name, prefix=object_path, include_version=False)
+    if not existing_files.objects and document_create.file_data is not None:
+        file_data_bytes = base64.b64decode(document_create.file_data)
         response = files.put_object(
             client, bucket=workspace.name, object=object_path, data=file_data_bytes, 
             size=len(file_data_bytes), content_type="application/pdf", 
